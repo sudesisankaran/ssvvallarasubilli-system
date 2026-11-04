@@ -1,21 +1,33 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
 
 const STORAGE_KEY = 'ssv_firebase_config_v1';
 
-// Default / fallback configuration from Vite environment variables
+// Default configuration provided for SSV Vallarasu Bills System
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDQi43OYV0uXiBGa5Stehbl0QYlr9GUI6o",
+  authDomain: "ssvvallarasubillsystem.firebaseapp.com",
+  projectId: "ssvvallarasubillsystem",
+  storageBucket: "ssvvallarasubillsystem.firebasestorage.app",
+  messagingSenderId: "825474038746",
+  appId: "1:825474038746:web:a0ed9a0368537fde5edee3",
+  measurementId: "G-6WFTCZM5DN"
+};
+
+// Fallback configuration from Vite environment variables or defaults
 const getEnvConfig = () => ({
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || DEFAULT_FIREBASE_CONFIG.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || DEFAULT_FIREBASE_CONFIG.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || DEFAULT_FIREBASE_CONFIG.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || DEFAULT_FIREBASE_CONFIG.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || DEFAULT_FIREBASE_CONFIG.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || DEFAULT_FIREBASE_CONFIG.appId,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || DEFAULT_FIREBASE_CONFIG.measurementId
 });
 
-// Load config from localStorage (user configured) or env variables
+// Load config from localStorage (user configured) or env variables / defaults
 export const getActiveFirebaseConfig = () => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -34,7 +46,6 @@ export const getActiveFirebaseConfig = () => {
 export const saveFirebaseConfig = (config) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    // Reload to apply new Firebase app instance
     return true;
   } catch (err) {
     console.error('Failed to save Firebase config:', err);
@@ -77,7 +88,7 @@ export { app, auth, storage, db, googleProvider };
 // Google Sign-In helper
 export const loginWithGooglePopup = async () => {
   if (!auth) {
-    throw new Error('Firebase Auth is not configured yet. Please configure your Firebase keys in Shop Settings.');
+    throw new Error('Firebase Auth is not initialized.');
   }
   try {
     const result = await signInWithPopup(auth, googleProvider);
