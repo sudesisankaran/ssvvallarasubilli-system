@@ -13,6 +13,7 @@ import Settings from './components/Settings';
 import InvoiceModal from './components/InvoiceModal';
 import CustomerHistoryModal from './components/CustomerHistoryModal';
 import PaymentModal from './components/PaymentModal';
+import LoginModal from './components/LoginModal';
 
 export default function App() {
   const { activeTab } = useShop();
@@ -56,8 +57,8 @@ export default function App() {
       <InvoiceModal />
       <CustomerHistoryModal />
       <PaymentModal />
+      <LoginModal />
       <ToastContainer />
     </div>
   );
 }
-
