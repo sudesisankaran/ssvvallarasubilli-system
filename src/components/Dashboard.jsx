@@ -12,8 +12,14 @@ import {
   ArrowRight,
   Eye,
   Pencil,
-  Kanban,
-  Printer
+  Printer,
+  Share2,
+  Download,
+  CreditCard,
+  UserPlus,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Wallet
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -44,21 +50,25 @@ export default function Dashboard() {
     settings,
     setActiveTab,
     setViewingInvoice,
-    setEditingInvoice
+    setEditingInvoice,
+    setPaymentInvoice
   } = useShop();
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Metrics
+  // Financial Metrics (Vyapar Style)
   const totalSales = invoices.reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
+  const totalPaid = invoices.reduce((sum, inv) => sum + (parseFloat(inv.paidAmount) || 0), 0);
+  const pendingReceivables = invoices.reduce((sum, inv) => sum + (parseFloat(inv.balanceAmount) || 0), 0);
   const todaySales = invoices
     .filter(inv => inv.date === todayStr)
     .reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
-  const totalInvoicesCount = invoices.length;
-  const pendingPayments = invoices.reduce((sum, inv) => sum + (parseFloat(inv.balanceAmount) || 0), 0);
-  const totalCustomersCount = customers.length;
 
-  // Chart 1: Monthly Sales Trend (Last 6 Months)
+  const pendingPartiesCount = new Set(
+    invoices.filter(i => (parseFloat(i.balanceAmount) || 0) > 0).map(i => i.customerName)
+  ).size;
+
+  // Chart: Monthly Sales Trend (Last 6 Months)
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const now = new Date();
   const monthlyLabels = [];
@@ -84,9 +94,9 @@ export default function Dashboard() {
     datasets: [{
       label: 'Sales Revenue (₹)',
       data: monthlyLabels.map(l => monthlyData[l]),
-      backgroundColor: '#4f46e5',
-      borderRadius: 8,
-      hoverBackgroundColor: '#4338ca'
+      backgroundColor: '#d32f2f',
+      borderRadius: 6,
+      hoverBackgroundColor: '#b71c1c'
     }]
   };
 
@@ -106,306 +116,340 @@ export default function Dashboard() {
     }
   };
 
-  // Chart 2: Payment Status Overview
-  const paidCount = invoices.filter(i => i.paymentStatus === 'Paid').length;
-  const partialCount = invoices.filter(i => i.paymentStatus === 'Partial').length;
-  const unpaidCount = invoices.filter(i => i.paymentStatus === 'Unpaid').length;
+  // Recent 6 Invoices
+  const recentInvoices = invoices.slice(0, 6);
 
-  const donutChartData = {
-    labels: ['Fully Paid', 'Partial Advance', 'Unpaid / Credit'],
-    datasets: [{
-      data: [paidCount, partialCount, unpaidCount],
-      backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-      borderWidth: 2,
-      borderColor: '#ffffff'
-    }]
-  };
-
-  const donutChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { position: 'bottom' }
+  // Top Debtors (Parties with Outstanding Dues)
+  const debtorsMap = {};
+  invoices.forEach(inv => {
+    const bal = parseFloat(inv.balanceAmount) || 0;
+    if (bal > 0) {
+      if (!debtorsMap[inv.customerName]) {
+        debtorsMap[inv.customerName] = {
+          name: inv.customerName,
+          phone: inv.customerPhone,
+          balance: 0,
+          invoicesCount: 0
+        };
+      }
+      debtorsMap[inv.customerName].balance += bal;
+      debtorsMap[inv.customerName].invoicesCount += 1;
     }
+  });
+  const topDebtors = Object.values(debtorsMap).sort((a, b) => b.balance - a.balance).slice(0, 5);
+
+  const handleWhatsAppReminder = (debtor) => {
+    const text = encodeURIComponent(
+      `Dear ${debtor.name}, your outstanding balance at ${settings.shopName || 'SSV VALLARASU FLAGS'} is ${formatCurrency(debtor.balance)}. Kindly clear the pending payment at your earliest convenience. Thank you!`
+    );
+    const phone = debtor.phone ? debtor.phone.replace(/[^0-9]/g, '') : '';
+    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
   };
 
   return (
     <div className="space-y-4">
-      {/* Quick Action Banner */}
-      <div className="quick-action-banner">
-        <div className="banner-content">
-          <h2>{settings.shopName || 'SSV VALLARASU'} – {settings.shopSubtitle || 'FLAGS & PRINTING'}</h2>
-          <p>{settings.tagline || 'Leading Manufacturer of Digital Flags, Political Flags, Banners & Display Boards'}</p>
+      {/* 1. VYAPAR AT-A-GLANCE FINANCIAL METRIC CARDS */}
+      <div className="row g-3">
+        {/* You'll Receive (Pending Receivables) */}
+        <div className="col-xl-3 col-sm-6">
+          <div className="vyapar-kpi-card receivable h-100">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
+                You'll Receive
+              </span>
+              <span className="badge bg-danger-subtle text-danger border border-danger-subtle py-1 px-2 d-flex align-items-center gap-1">
+                <ArrowDownLeft size={13} /> To Collect
+              </span>
+            </div>
+            <div className="fs-3 fw-extrabold text-danger my-1">
+              {formatCurrency(pendingReceivables)}
+            </div>
+            <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
+              <span>{pendingPartiesCount} Parties with dues</span>
+              <span className="text-primary fw-semibold cursor-pointer" onClick={() => setActiveTab('invoices')}>
+                View Invoices &rarr;
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="banner-actions">
+
+        {/* Total Sales */}
+        <div className="col-xl-3 col-sm-6">
+          <div className="vyapar-kpi-card sales h-100">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
+                Total Sales
+              </span>
+              <span className="badge bg-danger text-white py-1 px-2 d-flex align-items-center gap-1">
+                <TrendingUp size={13} /> Revenue
+              </span>
+            </div>
+            <div className="fs-3 fw-extrabold text-dark my-1">
+              {formatCurrency(totalSales)}
+            </div>
+            <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
+              <span>Today's Sale: <strong>{formatCurrency(todaySales)}</strong></span>
+              <span>{invoices.length} Bills</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cash / Paid Collected */}
+        <div className="col-xl-3 col-sm-6">
+          <div className="vyapar-kpi-card cash h-100">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
+                Paid &amp; Collected
+              </span>
+              <span className="badge bg-success-subtle text-success border border-success-subtle py-1 px-2 d-flex align-items-center gap-1">
+                <CheckCircle2 size={13} /> Settled
+              </span>
+            </div>
+            <div className="fs-3 fw-extrabold text-success my-1">
+              {formatCurrency(totalPaid)}
+            </div>
+            <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
+              <span>In Hand / Bank</span>
+              <span>{invoices.filter(i => i.paymentStatus === 'Paid').length} Fully Paid</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Parties (Total Customers) */}
+        <div className="col-xl-3 col-sm-6">
+          <div className="vyapar-kpi-card parties h-100">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
+                Total Parties
+              </span>
+              <span className="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-2 d-flex align-items-center gap-1">
+                <Users size={13} /> Clients
+              </span>
+            </div>
+            <div className="fs-3 fw-extrabold text-dark my-1">
+              {customers.length}
+            </div>
+            <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
+              <span>Registered Accounts</span>
+              <span className="text-primary fw-semibold cursor-pointer" onClick={() => setActiveTab('customers')}>
+                Parties &rarr;
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. VYAPAR QUICK ACTIONS BAR */}
+      <div className="bg-white border rounded-3 p-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div className="d-flex flex-wrap align-items-center gap-2">
           <button
             type="button"
-            className="btn btn-light fw-bold"
+            className="btn btn-vyapar-sale fw-bold px-3 py-2 d-flex align-items-center gap-2"
             onClick={() => {
               setEditingInvoice(null);
               setActiveTab('billing');
             }}
           >
-            <Plus size={16} className="text-primary me-1" /> Create New Bill
+            <Plus size={16} /> + Add Sale (Bill)
           </button>
+
           <button
             type="button"
-            className="btn btn-outline-light"
-            onClick={() => setActiveTab('orders')}
+            className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
+            onClick={() => setActiveTab('customers')}
           >
-            <Kanban size={16} className="me-1" /> Order Pipeline
+            <UserPlus size={15} className="me-1 d-inline" /> + Add Party
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
+            onClick={() => setActiveTab('invoices')}
+          >
+            <Receipt size={15} className="me-1 d-inline" /> View All Invoices
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
+            onClick={() => setActiveTab('reports')}
+          >
+            <TrendingUp size={15} className="me-1 d-inline" /> Sales Daybook
           </button>
         </div>
-      </div>
 
-      {/* KPI Cards */}
-      <div className="row g-3">
-        <div className="col-xl col-md-4 col-sm-6">
-          <div className="stat-card accent-primary">
-            <div className="stat-header">
-              <span className="stat-title">Total Sales</span>
-              <div className="stat-icon primary"><TrendingUp size={20} /></div>
-            </div>
-            <div className="stat-value">{formatCurrency(totalSales)}</div>
-            <div className="stat-subtext text-muted">
-              <CheckCircle2 size={13} className="text-success me-1" /> All completed orders
-            </div>
-          </div>
-        </div>
-
-        <div className="col-xl col-md-4 col-sm-6">
-          <div className="stat-card accent-success">
-            <div className="stat-header">
-              <span className="stat-title">Today's Sales</span>
-              <div className="stat-icon success"><Receipt size={20} /></div>
-            </div>
-            <div className="stat-value text-success">{formatCurrency(todaySales)}</div>
-            <div className="stat-subtext text-muted">
-              <Clock size={13} className="text-success me-1" /> Daily bookings
-            </div>
-          </div>
-        </div>
-
-        <div className="col-xl col-md-4 col-sm-6">
-          <div className="stat-card accent-purple">
-            <div className="stat-header">
-              <span className="stat-title">Total Invoices</span>
-              <div className="stat-icon purple"><Printer size={20} /></div>
-            </div>
-            <div className="stat-value">{totalInvoicesCount}</div>
-            <div className="stat-subtext text-muted">Generated tax bills</div>
-          </div>
-        </div>
-
-        <div className="col-xl col-md-6 col-sm-6">
-          <div className="stat-card accent-danger">
-            <div className="stat-header">
-              <span className="stat-title">Pending Due</span>
-              <div className="stat-icon danger"><AlertCircle size={20} /></div>
-            </div>
-            <div className="stat-value text-danger">{formatCurrency(pendingPayments)}</div>
-            <div className="stat-subtext text-muted">Receivables to collect</div>
-          </div>
-        </div>
-
-        <div className="col-xl col-md-6 col-sm-12">
-          <div className="stat-card accent-warning">
-            <div className="stat-header">
-              <span className="stat-title">Customers</span>
-              <div className="stat-icon warning"><Users size={20} /></div>
-            </div>
-            <div className="stat-value">{totalCustomersCount}</div>
-            <div className="stat-subtext text-muted">Active client directory</div>
-          </div>
+        <div className="d-flex align-items-center gap-2">
+          <span className="small text-muted fw-semibold">
+            {settings.shopName || 'SSV VALLARASU'} • Flag Printing Counter
+          </span>
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="row g-3">
+      {/* 3. MAIN SPLIT: RECENT TRANSACTIONS & SALES CHART */}
+      <div className="row g-4">
+        {/* Left: Recent Transactions (Sales Register) */}
         <div className="col-lg-8">
-          <div className="card-custom h-100 mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Monthly Sales Revenue (₹)</h2>
-              <span className="badge bg-light text-muted border">Last 6 Months</span>
-            </div>
-            <div className="card-body-custom" style={{ height: '300px' }}>
-              <Bar data={barChartData} options={barChartOptions} />
-            </div>
-          </div>
-        </div>
-
-        <div className="col-lg-4">
-          <div className="card-custom h-100 mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Payment Status</h2>
-              <span className="badge bg-light text-muted border">Overview</span>
-            </div>
-            <div className="card-body-custom d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-              {invoices.length === 0 ? (
-                <div className="text-center text-muted small">
-                  <Receipt size={36} className="d-block mx-auto mb-2 text-secondary opacity-50" />
-                  No invoice data to chart yet
-                </div>
-              ) : (
-                <Doughnut data={donutChartData} options={donutChartOptions} />
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Invoices Table & Activity */}
-      <div className="row g-3">
-        <div className="col-lg-8">
-          <div className="card-custom mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Recent Invoices</h2>
+          <div className="card-custom h-100">
+            <div className="card-header-custom d-flex justify-content-between align-items-center">
+              <div className="d-flex align-items-center gap-2">
+                <Receipt size={18} className="text-danger" />
+                <h2 className="fs-6 fw-bold mb-0">Recent Sales &amp; Invoices</h2>
+              </div>
               <button
                 type="button"
-                className="btn btn-sm btn-link text-decoration-none fw-bold p-0"
+                className="btn btn-sm btn-link text-danger text-decoration-none fw-bold p-0"
                 onClick={() => setActiveTab('invoices')}
               >
-                View All <ArrowRight size={14} className="d-inline" />
+                View All &rarr;
               </button>
             </div>
-            <div className="table-custom-wrapper">
-              {invoices.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                  <Receipt size={40} className="mx-auto mb-2 text-secondary opacity-50" />
-                  <p className="fw-bold mb-1">No Invoices Created Yet</p>
-                  <small className="d-block mb-3">Create your first bill to see recent transactions here.</small>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary-custom"
-                    onClick={() => {
-                      setEditingInvoice(null);
-                      setActiveTab('billing');
-                    }}
-                  >
-                    <Plus size={14} /> Create First Bill
-                  </button>
-                </div>
-              ) : (
-                <table className="table-custom">
-                  <thead>
-                    <tr>
-                      <th>Invoice No</th>
-                      <th>Customer / Date</th>
-                      <th>Total</th>
-                      <th>Balance Due</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.slice(0, 5).map(inv => {
-                      let statusClass = 'badge-unpaid';
-                      if (inv.paymentStatus === 'Paid') statusClass = 'badge-paid';
-                      else if (inv.paymentStatus === 'Partial') statusClass = 'badge-partial';
+
+            <div className="table-responsive">
+              <table className="table vyapar-table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Invoice No</th>
+                    <th>Party Name</th>
+                    <th>Payment</th>
+                    <th className="text-end">Amount</th>
+                    <th className="text-end">Balance</th>
+                    <th className="text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentInvoices.length > 0 ? (
+                    recentInvoices.map(inv => {
+                      const isPaid = inv.paymentStatus === 'Paid';
+                      const isPartial = inv.paymentStatus === 'Partial';
 
                       return (
                         <tr key={inv.id}>
-                          <td>
-                            <button
-                              type="button"
-                              className="btn btn-link p-0 fw-bold text-primary text-decoration-none"
-                              onClick={() => setViewingInvoice(inv)}
-                            >
-                              {inv.invoiceNumber}
-                            </button>
+                          <td className="small text-muted font-monospace">
+                            {formatDate(inv.date)}
+                          </td>
+                          <td className="fw-bold font-monospace text-dark">
+                            {inv.invoiceNumber}
                           </td>
                           <td>
-                            <div className="fw-bold text-dark">{inv.customerName}</div>
-                            <small className="text-muted">{formatDate(inv.date)}</small>
-                          </td>
-                          <td className="fw-bold">{formatCurrency(inv.grandTotal)}</td>
-                          <td className={inv.balanceAmount > 0 ? 'text-danger fw-bold' : 'text-success'}>
-                            {formatCurrency(inv.balanceAmount)}
+                            <div className="fw-semibold text-dark">{inv.customerName}</div>
+                            {inv.customerPhone && (
+                              <div className="small text-muted" style={{ fontSize: '0.72rem' }}>
+                                {inv.customerPhone}
+                              </div>
+                            )}
                           </td>
                           <td>
-                            <span className={`badge-status ${statusClass}`}>
+                            <span className={`badge ${isPaid ? 'bg-success-subtle text-success' : (isPartial ? 'bg-warning-subtle text-warning' : 'bg-danger-subtle text-danger')} border`}>
                               {inv.paymentStatus}
                             </span>
                           </td>
-                          <td>
-                            <div className="d-flex align-items-center gap-1">
+                          <td className="text-end fw-bold text-dark">
+                            {formatCurrency(inv.grandTotal)}
+                          </td>
+                          <td className="text-end">
+                            {inv.balanceAmount > 0 ? (
+                              <span className="text-danger fw-bold">{formatCurrency(inv.balanceAmount)}</span>
+                            ) : (
+                              <span className="text-muted small">₹0</span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            <div className="btn-group btn-group-sm">
                               <button
                                 type="button"
-                                className="btn-action-icon"
-                                title="View & Print"
+                                className="btn btn-xs btn-outline-secondary py-0 px-2"
+                                title="View & Print Bill"
                                 onClick={() => setViewingInvoice(inv)}
                               >
-                                <Eye size={15} />
+                                <Eye size={13} />
                               </button>
                               <button
                                 type="button"
-                                className="btn-action-icon"
-                                title="Edit Invoice"
+                                className="btn btn-xs btn-outline-primary py-0 px-2"
+                                title="Edit Bill"
                                 onClick={() => {
                                   setEditingInvoice(inv);
                                   setActiveTab('billing');
                                 }}
                               >
-                                <Pencil size={15} />
+                                <Pencil size={13} />
                               </button>
                             </div>
                           </td>
                         </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
-              )}
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="text-center py-4 text-muted">
+                        No sales recorded yet. Click <strong>"+ Add Sale"</strong> to create your first bill!
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <div className="col-lg-4">
-          <div className="card-custom mb-0 h-100">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Recent Activity</h2>
-              <span className="badge bg-primary-subtle text-primary">Live</span>
+        {/* Right: Outstanding Debtors & Monthly Chart */}
+        <div className="col-lg-4 space-y-4">
+          {/* Top Parties To Receive */}
+          <div className="card-custom">
+            <div className="card-header-custom d-flex justify-content-between align-items-center">
+              <h3 className="fs-6 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                <AlertCircle size={16} className="text-danger" /> Pending Receivables
+              </h3>
+              <span className="badge bg-danger-subtle text-danger small">
+                {topDebtors.length} Parties
+              </span>
             </div>
-            <div className="card-body-custom p-3">
-              {invoices.length === 0 ? (
-                <div className="text-center py-5 text-muted small">
-                  <Clock size={32} className="mx-auto mb-2 text-secondary opacity-50" />
-                  No recent activity recorded yet.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {invoices.slice(0, 4).map(inv => (
-                    <div
-                      key={inv.id}
-                      className="d-flex align-items-center justify-content-between p-2 rounded border-bottom"
-                    >
-                      <div className="d-flex align-items-center gap-2">
-                        <div
-                          className="rounded-circle bg-primary-subtle text-primary p-2 d-flex align-items-center justify-content-center"
-                          style={{ width: '36px', height: '36px' }}
-                        >
-                          <Receipt size={16} />
-                        </div>
-                        <div>
-                          <div className="fw-bold text-dark small">{inv.customerName}</div>
-                          <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                            {inv.invoiceNumber} • {formatDate(inv.date)}
-                          </div>
+
+            <div className="p-0">
+              {topDebtors.length > 0 ? (
+                <div className="divide-y">
+                  {topDebtors.map((debtor, idx) => (
+                    <div key={idx} className="p-3 d-flex align-items-center justify-content-between border-bottom">
+                      <div>
+                        <div className="fw-bold text-dark small">{debtor.name}</div>
+                        <div className="text-muted small" style={{ fontSize: '0.72rem' }}>
+                          {debtor.phone || 'No phone'} • {debtor.invoicesCount} bill(s)
                         </div>
                       </div>
                       <div className="text-end">
-                        <div className="fw-bold text-primary small">{formatCurrency(inv.grandTotal)}</div>
-                        <span
-                          className={`badge ${inv.paymentStatus === 'Paid' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'} small`}
-                          style={{ fontSize: '0.68rem' }}
+                        <div className="fw-extrabold text-danger small">
+                          {formatCurrency(debtor.balance)}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-outline-success py-0 px-2 mt-1"
+                          onClick={() => handleWhatsAppReminder(debtor)}
+                          title="Send WhatsApp payment reminder"
                         >
-                          {inv.paymentStatus}
-                        </span>
+                          <Share2 size={11} className="me-1 d-inline" /> Remind
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div className="p-4 text-center text-muted small">
+                  <CheckCircle2 size={24} className="text-success mx-auto mb-2" />
+                  <div>No pending dues! All invoices are fully settled.</div>
+                </div>
               )}
+            </div>
+          </div>
+
+          {/* Monthly Revenue Trend */}
+          <div className="card-custom">
+            <div className="card-header-custom">
+              <h3 className="fs-6 fw-bold mb-0 text-dark">Monthly Sales Trend</h3>
+            </div>
+            <div className="card-body-custom" style={{ height: '220px' }}>
+              <Bar data={barChartData} options={barChartOptions} />
             </div>
           </div>
         </div>
@@ -413,4 +457,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

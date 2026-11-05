@@ -353,14 +353,14 @@ export default function Billing() {
           </button>
           <button
             type="button"
-            className="btn btn-primary-custom btn-sm px-4 fw-semibold shadow-sm"
+            className="btn btn-vyapar-sale btn-sm px-4 fw-semibold shadow-sm"
             onClick={() => handleSaveInvoice(false)}
           >
             <Save size={15} className="me-1 d-inline" /> {editingInvoice ? 'Update Bill' : 'Save Bill'}
           </button>
           <button
             type="button"
-            className="btn btn-success btn-sm px-4 py-2 fw-bold shadow-sm"
+            className="btn btn-vyapar-print btn-sm px-4 py-2 fw-bold shadow-sm"
             onClick={() => handleSaveInvoice(true)}
           >
             <Printer size={16} className="me-1 d-inline" /> Save &amp; Print
@@ -718,14 +718,14 @@ export default function Billing() {
           </button>
           <button
             type="button"
-            className="btn btn-primary-custom btn-sm px-4 fw-semibold shadow-sm"
+            className="btn btn-vyapar-sale btn-sm px-4 fw-semibold shadow-sm"
             onClick={() => handleSaveInvoice(false)}
           >
             <Save size={15} className="me-1 d-inline" /> {editingInvoice ? 'Update Bill' : 'Save Bill'}
           </button>
           <button
             type="button"
-            className="btn btn-success btn-sm px-4 py-2 fw-bold shadow-sm"
+            className="btn btn-vyapar-print btn-sm px-4 py-2 fw-bold shadow-sm"
             onClick={() => handleSaveInvoice(true)}
           >
             <Printer size={16} className="me-1 d-inline" /> Save &amp; Print Bill

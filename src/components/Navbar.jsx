@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { useAuth } from '../context/AuthContext';
-import { Menu, Clock, Bell, Plus } from 'lucide-react';
+import { Menu, Clock, Bell, Plus, Search, Cloud } from 'lucide-react';
 
 export default function Navbar() {
   const {
@@ -13,7 +13,7 @@ export default function Navbar() {
     setEditingInvoice
   } = useShop();
 
-  const { user, setLoginModalOpen } = useAuth();
+  const { user, setLoginModalOpen, isConfigured } = useAuth();
 
   const [currentTime, setCurrentTime] = useState('');
 
@@ -24,7 +24,6 @@ export default function Navbar() {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
-        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -37,13 +36,13 @@ export default function Navbar() {
   }, []);
 
   const titles = {
-    dashboard: { title: 'Dashboard Overview', breadcrumb: 'Home / Dashboard' },
-    billing: { title: 'Create New Bill', breadcrumb: 'Billing / New Invoice' },
-    invoices: { title: 'All Invoices', breadcrumb: 'Invoices / Management' },
-    customers: { title: 'Customer Directory', breadcrumb: 'Customers / Management' },
-    orders: { title: 'Order Tracking & Pipeline', breadcrumb: 'Orders / Production' },
-    reports: { title: 'Sales Analytics & Reports', breadcrumb: 'Reports / Financial Insights' },
-    settings: { title: 'Shop & System Settings', breadcrumb: 'Settings / Configuration' },
+    dashboard: { title: 'Dashboard', breadcrumb: 'Vyapar / Business Overview' },
+    billing: { title: 'Sale Invoice (Bill)', breadcrumb: 'Sales / New Cash Memo' },
+    invoices: { title: 'Sales / All Invoices', breadcrumb: 'Sales / Invoice Register' },
+    customers: { title: 'Parties (Customers)', breadcrumb: 'Parties / Customer Directory' },
+    orders: { title: 'Delivery Pipeline', breadcrumb: 'Production / Flag Orders' },
+    reports: { title: 'Reports & Daybook', breadcrumb: 'Accounting / Financial Statements' },
+    settings: { title: 'Settings & Cloud Sync', breadcrumb: 'Configuration / Firebase Sync' },
   };
 
   const currentInfo = titles[activeTab] || { title: 'SSV Vallarasu', breadcrumb: 'Dashboard' };
@@ -67,16 +66,25 @@ export default function Navbar() {
         </button>
 
         <div className="page-title-box">
-          <h1>{currentInfo.title}</h1>
+          <h1 className="fw-bold">{currentInfo.title}</h1>
           <p className="breadcrumb-sub">{currentInfo.breadcrumb}</p>
         </div>
       </div>
 
       <div className="topbar-right">
+        {/* Vyapar Active Store Indicator */}
+        <div className="d-none d-xl-flex align-items-center gap-2 px-3 py-1 bg-light border rounded-pill">
+          <span className="d-inline-block rounded-circle bg-success shadow-sm" style={{ width: '7px', height: '7px' }}></span>
+          <span className="small fw-bold text-dark">{settings.shopName || 'SSV VALLARASU'}</span>
+          <span className="badge bg-danger text-white py-0 px-2 fw-bold" style={{ fontSize: '0.62rem' }}>
+            FLAGS &amp; PRINTING
+          </span>
+        </div>
+
         {/* Live Clock */}
         <div className="live-clock-pill d-none d-md-flex">
-          <Clock size={15} />
-          <span>{currentTime || 'Loading clock...'}</span>
+          <Clock size={14} className="text-muted" />
+          <span>{currentTime || 'Clock'}</span>
         </div>
 
         {/* Pending Invoices Notification Bell */}
@@ -84,7 +92,7 @@ export default function Navbar() {
           type="button"
           className="topbar-btn position-relative"
           onClick={() => setActiveTab('invoices')}
-          title="View Pending Invoices"
+          title="View Pending Dues / Invoices"
         >
           <Bell size={18} />
           {pendingCount > 0 && (
@@ -92,22 +100,15 @@ export default function Navbar() {
           )}
         </button>
 
-        {/* Quick Logo / Shop Pill */}
-        {settings.logoUrl && (
-          <div
-            className="d-none d-lg-flex align-items-center gap-2 px-2 py-1 bg-light border rounded-pill cursor-pointer"
-            onClick={() => setActiveTab('settings')}
-            title="Custom Logo Active - Click to Manage"
-          >
-            <img
-              src={settings.logoUrl}
-              alt="Logo"
-              style={{ width: '24px', height: '24px', objectFit: 'contain' }}
-              className="rounded-circle"
-            />
-            <span className="small text-muted fw-bold pe-1">Custom Logo</span>
-          </div>
-        )}
+        {/* Firebase Cloud Sync Status */}
+        <button
+          type="button"
+          className="topbar-btn"
+          onClick={() => setActiveTab('settings')}
+          title={isConfigured ? 'Firebase Cloud Storage Connected' : 'Configure Firebase'}
+        >
+          <Cloud size={18} className={isConfigured ? 'text-success' : 'text-muted'} />
+        </button>
 
         {/* Google User Profile or Sign-In Button */}
         {user ? (
@@ -125,15 +126,15 @@ export default function Navbar() {
               />
             ) : (
               <div
-                className="rounded-circle bg-primary text-white small fw-bold d-flex align-items-center justify-content-center"
+                className="rounded-circle bg-danger text-white small fw-bold d-flex align-items-center justify-content-center"
                 style={{ width: '26px', height: '26px', fontSize: '0.75rem' }}
               >
-                {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'G'}
               </div>
             )}
             <span
               className="small fw-bold text-dark d-none d-md-inline pe-1"
-              style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             >
               {user.displayName ? user.displayName.split(' ')[0] : 'Admin'}
             </span>
@@ -141,7 +142,7 @@ export default function Navbar() {
         ) : (
           <button
             type="button"
-            className="btn btn-sm btn-outline-primary fw-semibold d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm bg-white"
+            className="btn btn-sm btn-outline-secondary fw-semibold d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm bg-white"
             onClick={() => setLoginModalOpen(true)}
             title="Sign in with Google"
           >
@@ -167,14 +168,14 @@ export default function Navbar() {
           </button>
         )}
 
-        {/* Create Bill Primary Shortcut */}
+        {/* Vyapar Signature "+ Add Sale" Button */}
         <button
           type="button"
-          className="btn btn-primary-custom"
+          className="btn btn-vyapar-sale d-flex align-items-center gap-1 px-3 py-1 shadow-sm"
           onClick={handleCreateNewBill}
         >
           <Plus size={16} />
-          <span className="d-none d-sm-inline">Create Bill</span>
+          <span>Add Sale</span>
         </button>
       </div>
     </header>

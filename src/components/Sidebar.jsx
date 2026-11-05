@@ -2,16 +2,16 @@ import React from 'react';
 import { useShop } from '../context/ShopContext';
 import {
   LayoutDashboard,
-  FilePlus2,
-  FileText,
   Users,
-  Printer,
-  Kanban,
+  Receipt,
+  PlusCircle,
+  Truck,
   BarChart3,
   Settings,
   ChevronLeft,
   ChevronRight,
-  Flag
+  Flag,
+  Cloud
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -23,26 +23,23 @@ export default function Sidebar() {
     setSidebarCollapsed,
     mobileSidebarOpen,
     setMobileSidebarOpen,
-    invoices
+    invoices,
+    customers,
+    setEditingInvoice
   } = useShop();
-
-  const mainMenu = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'billing', label: 'Create New Bill', icon: FilePlus2, badge: 'New' },
-    { id: 'invoices', label: 'All Invoices', icon: FileText, count: invoices.length },
-    { id: 'customers', label: 'Customers', icon: Users },
-    { id: 'orders', label: 'Order Pipeline', icon: Kanban },
-  ];
-
-  const configMenu = [
-    { id: 'reports', label: 'Sales Reports', icon: BarChart3 },
-    { id: 'settings', label: 'Shop Settings', icon: Settings },
-  ];
 
   const handleNavClick = (id) => {
     setActiveTab(id);
     if (mobileSidebarOpen) setMobileSidebarOpen(false);
   };
+
+  const handleNewSale = () => {
+    setEditingInvoice(null);
+    setActiveTab('billing');
+    if (mobileSidebarOpen) setMobileSidebarOpen(false);
+  };
+
+  const pendingBillsCount = invoices.filter(i => i.paymentStatus !== 'Paid').length;
 
   return (
     <>
@@ -66,16 +63,18 @@ export default function Sidebar() {
                 src={settings.logoUrl}
                 alt="Shop Logo"
                 className="brand-logo-img rounded-3"
-                style={{ width: '42px', height: '42px', objectFit: 'contain', background: '#fff', padding: '3px' }}
+                style={{ width: '40px', height: '40px', objectFit: 'contain', background: '#fff', padding: '3px' }}
               />
             ) : (
-              <div className="brand-logo-icon">
+              <div className="brand-logo-icon" style={{ background: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)' }}>
                 <Flag className="w-5 h-5 text-white" />
               </div>
             )}
             <div className="brand-details">
               <span className="brand-name">{settings.shopName || 'SSV VALLARASU'}</span>
-              <span className="brand-sub">{settings.shopSubtitle || 'FLAGS & PRINTING'}</span>
+              <span className="brand-sub" style={{ color: '#fca5a5' }}>
+                {settings.shopSubtitle || 'FLAGS & DIGITAL PRINTING'}
+              </span>
             </div>
           </div>
 
@@ -89,60 +88,114 @@ export default function Sidebar() {
           </button>
         </div>
 
+        {/* Vyapar Quick Action Button */}
+        <div className="px-3 pt-3 pb-1">
+          <button
+            type="button"
+            className="btn btn-vyapar-sale w-100 py-2 d-flex align-items-center justify-content-center gap-2"
+            onClick={handleNewSale}
+            title="Add Sale (Create Bill)"
+          >
+            <PlusCircle size={18} />
+            <span className="nav-text">Add Sale (Bill)</span>
+          </button>
+        </div>
+
         {/* Sidebar Body */}
         <div className="sidebar-body">
-          <div className="section-label">Main Menu</div>
-          <ul className="nav flex-column mb-3">
-            {mainMenu.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <li className="nav-item" key={item.id}>
-                  <button
-                    type="button"
-                    className={`nav-link w-100 text-start border-0 bg-transparent ${isActive ? 'active' : ''}`}
-                    onClick={() => handleNavClick(item.id)}
-                  >
-                    <Icon className="nav-icon" size={18} />
-                    <span className="nav-text">{item.label}</span>
-                    {item.badge && <span className="badge-nav bg-primary text-white ms-auto">{item.badge}</span>}
-                    {item.count !== undefined && item.count > 0 && (
-                      <span className="badge-nav bg-secondary text-white ms-auto">{item.count}</span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
+          <div className="section-label">General</div>
+          <ul className="nav flex-column mb-2">
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => handleNavClick('dashboard')}
+              >
+                <LayoutDashboard className="nav-icon" size={18} />
+                <span className="nav-text">Dashboard</span>
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'customers' ? 'active' : ''}`}
+                onClick={() => handleNavClick('customers')}
+              >
+                <Users className="nav-icon" size={18} />
+                <span className="nav-text">Parties (Customers)</span>
+                {customers.length > 0 && (
+                  <span className="badge-nav bg-secondary text-white ms-auto">{customers.length}</span>
+                )}
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'invoices' ? 'active' : ''}`}
+                onClick={() => handleNavClick('invoices')}
+              >
+                <Receipt className="nav-icon" size={18} />
+                <span className="nav-text">Sales / Invoices</span>
+                {pendingBillsCount > 0 && (
+                  <span className="badge-nav bg-danger text-white ms-auto" title="Pending Dues">
+                    {pendingBillsCount} Due
+                  </span>
+                )}
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'orders' ? 'active' : ''}`}
+                onClick={() => handleNavClick('orders')}
+              >
+                <Truck className="nav-icon" size={18} />
+                <span className="nav-text">Delivery Pipeline</span>
+              </button>
+            </li>
           </ul>
 
-          <div className="section-label">Config & Analytics</div>
+          <div className="section-label">Accounting &amp; Setup</div>
           <ul className="nav flex-column">
-            {configMenu.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <li className="nav-item" key={item.id}>
-                  <button
-                    type="button"
-                    className={`nav-link w-100 text-start border-0 bg-transparent ${isActive ? 'active' : ''}`}
-                    onClick={() => handleNavClick(item.id)}
-                  >
-                    <Icon className="nav-icon" size={18} />
-                    <span className="nav-text">{item.label}</span>
-                  </button>
-                </li>
-              );
-            })}
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'reports' ? 'active' : ''}`}
+                onClick={() => handleNavClick('reports')}
+              >
+                <BarChart3 className="nav-icon" size={18} />
+                <span className="nav-text">Reports &amp; Daybook</span>
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'settings' ? 'active' : ''}`}
+                onClick={() => handleNavClick('settings')}
+              >
+                <Settings className="nav-icon" size={18} />
+                <span className="nav-text">Settings &amp; Cloud</span>
+              </button>
+            </li>
           </ul>
         </div>
 
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
           <div className="admin-pill">
-            <div className="admin-avatar">SV</div>
+            <div className="admin-avatar" style={{ background: '#b71c1c', borderColor: '#d32f2f' }}>
+              SV
+            </div>
             <div className="admin-info sidebar-footer-text">
-              <span className="admin-name">Admin Console</span>
-              <span className="admin-role">Store Manager</span>
+              <span className="admin-name">SSV Billing Admin</span>
+              <span className="admin-role text-success d-flex align-items-center gap-1">
+                <span className="d-inline-block rounded-circle bg-success" style={{ width: '6px', height: '6px' }}></span>
+                Vyapar Edition • Online
+              </span>
             </div>
           </div>
         </div>
@@ -150,4 +203,3 @@ export default function Sidebar() {
     </>
   );
 }
-

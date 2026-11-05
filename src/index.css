@@ -4,18 +4,19 @@
    ========================================================================== */
 
 :root {
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --primary-light: #eef2ff;
-  --primary-dark: #3730a3;
-  --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --primary: #d32f2f;
+  --primary-hover: #b71c1c;
+  --primary-light: #fee2e2;
+  --primary-dark: #991b1b;
+  --primary-gradient: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
   --accent-gold: #f59e0b;
 
-  --navy-sidebar: #0f172a;
-  --navy-sidebar-dark: #020617;
-  --navy-border: #1e293b;
-  --navy-hover: #1e293b;
+  --navy-sidebar: #1e293b;
+  --navy-sidebar-dark: #0f172a;
+  --navy-border: #334155;
+  --navy-hover: #293548;
   --navy-text: #94a3b8;
+  --navy-active: #d32f2f;
 
   --bg-body: #f8fafc;
   --bg-surface: #f1f5f9;
@@ -24,13 +25,13 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
 
-  --success: #10b981;
+  --success: #16a34a;
   --success-light: #ecfdf5;
-  --warning: #f59e0b;
+  --warning: #d97706;
   --warning-light: #fffbeb;
-  --danger: #ef4444;
+  --danger: #dc2626;
   --danger-light: #fef2f2;
-  --purple: #8b5cf6;
+  --purple: #7c3aed;
   --purple-light: #f5f3ff;
 
   --sidebar-width: 270px;
@@ -238,14 +239,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar .nav-link:hover .nav-icon {
-  color: #a5b4fc;
+  color: #fca5a5;
 }
 
 .sidebar .nav-link.active {
   color: #fff;
   background: var(--primary-gradient);
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.4);
 }
 
 .sidebar .nav-link.active .nav-icon {
@@ -1179,4 +1180,123 @@ h1, h2, h3, h4, h5, h6 {
     padding: 20px 16px;
   }
 }
+
+/* ==========================================================================
+   VYAPAR DESIGN SYSTEM EXTENSIONS
+   (Similar to Vyapar Desktop & App UI/UX)
+   ========================================================================== */
+
+/* Vyapar Red Buttons */
+.btn-vyapar-sale {
+  background-color: #d32f2f !important;
+  color: #ffffff !important;
+  border: 1px solid #d32f2f !important;
+  font-weight: 700;
+  border-radius: 8px;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 0 2px 4px rgba(211, 47, 47, 0.25);
+}
+
+.btn-vyapar-sale:hover {
+  background-color: #b71c1c !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.35);
+}
+
+.btn-vyapar-print {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  border: 1px solid #16a34a !important;
+  font-weight: 700;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);
+}
+
+.btn-vyapar-print:hover {
+  background-color: #15803d !important;
+  color: #ffffff !important;
+}
+
+/* Vyapar Metric Cards */
+.vyapar-kpi-card {
+  border-radius: 12px;
+  padding: 1.25rem 1.15rem;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.vyapar-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+}
+
+.vyapar-kpi-card.receivable {
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+  border-left: 4px solid #16a34a !important;
+}
+
+.vyapar-kpi-card.sales {
+  background: linear-gradient(180deg, #ffffff 0%, #fff1f2 100%);
+  border-left: 4px solid #d32f2f !important;
+}
+
+.vyapar-kpi-card.cash {
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  border-left: 4px solid #2563eb !important;
+}
+
+.vyapar-kpi-card.parties {
+  background: linear-gradient(180deg, #ffffff 0%, #faf5ff 100%);
+  border-left: 4px solid #7c3aed !important;
+}
+
+/* Vyapar Parties 2-Column Split Pane */
+.party-sidebar-list {
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+}
+
+.party-item-card {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-left: 3px solid transparent;
+}
+
+.party-item-card:hover {
+  background-color: #f8fafc;
+}
+
+.party-item-card.active {
+  background-color: #fee2e2;
+  border-left-color: #d32f2f;
+}
+
+/* Vyapar Clean Table Headers */
+.vyapar-table th {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 14px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.vyapar-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.vyapar-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
 
