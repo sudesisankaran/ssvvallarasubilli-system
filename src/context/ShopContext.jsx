@@ -37,7 +37,31 @@ export function ShopProvider({ children }) {
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Automatically sync new real business profile if previous default was stored
+        if (!parsed.phone || parsed.phone.includes('98421') || (parsed.address && parsed.address.includes('Erode'))) {
+          const updated = {
+            ...DEFAULT_SETTINGS,
+            ...parsed,
+            shopName: 'SSV VALLARASU FLAG PRINTING',
+            phone: '93608 01346',
+            whatsapp: '93608 01346',
+            address: 'Rayakottai, Krishnagiri - 635116, Tamil Nadu',
+            city: 'Rayakottai',
+            district: 'Krishnagiri',
+            pincode: '635116',
+            state: 'Tamil Nadu',
+            branch: 'Rayakottai Branch',
+            upiId: '9360801346@upi',
+            terms: DEFAULT_SETTINGS.terms
+          };
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
+          return updated;
+        }
+        return { ...DEFAULT_SETTINGS, ...parsed };
+      }
+      return DEFAULT_SETTINGS;
     } catch {
       return DEFAULT_SETTINGS;
     }

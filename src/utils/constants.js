@@ -11,14 +11,17 @@ export const STORAGE_KEYS = {
 };
 
 export const DEFAULT_SETTINGS = {
-  shopName: 'SSV VALLARASU',
-  shopSubtitle: 'FLAGS & PRINTING',
+  shopName: 'SSV VALLARASU FLAG PRINTING',
+  shopSubtitle: 'FLAGS & DIGITAL PRINTING',
   tamilTitle: 'ஸ்ரீ சுப்ரமண்யா வேல் வல்லரசு கொடி & பிரிண்டிங்',
   tagline: 'Leading Manufacturer of Digital Flags, Political Flags, Banners & Display Boards',
-  phone: '+91 98421 55678',
-  whatsapp: '+91 98421 55678',
+  phone: '93608 01346',
+  whatsapp: '93608 01346',
   email: 'ssvvallarasuflags@gmail.com',
-  address: 'No. 42/B, Kongu Nagar, Opp. Old Bus Stand, Erode, Tamil Nadu - 638001',
+  address: 'Rayakottai, Krishnagiri - 635116, Tamil Nadu',
+  city: 'Rayakottai',
+  district: 'Krishnagiri',
+  pincode: '635116',
   state: 'Tamil Nadu',
   stateCode: '33',
   gstin: '33AAACV9842F1Z4',
@@ -28,15 +31,15 @@ export const DEFAULT_SETTINGS = {
   bankName: 'State Bank of India',
   accountNumber: '382947192840',
   ifscCode: 'SBIN0001234',
-  branch: 'Erode Main Branch',
-  upiId: '9842155678@sbi',
+  branch: 'Rayakottai Branch',
+  upiId: '9360801346@upi',
   logoUrl: null, // Custom user-uploaded logo
   currency: 'INR (₹)',
   terms: `1. 50% advance payment required for custom flag and bulk banner orders.
 2. Digital artwork approval is mandatory prior to printing.
 3. Colors may have a ±5% variation due to fabric dye sublimation.
 4. Delivered goods cannot be returned or refunded.
-5. All disputes subject to Erode jurisdiction only.`
+5. All disputes subject to Krishnagiri jurisdiction only.`
 };
 
 // Initial Services Catalog
