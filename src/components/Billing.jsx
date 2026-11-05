@@ -335,11 +335,11 @@ export default function Billing() {
 
         <div className="d-flex align-items-center gap-3">
           {/* Live Total Pill */}
-          <div className="bg-primary-subtle border border-primary-subtle px-3 py-1 rounded-3 text-end">
+          <div className="bg-light border px-3 py-1 rounded-3 text-end">
             <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.68rem', letterSpacing: '0.5px' }}>
               Total Bill
             </div>
-            <div className="fs-5 fw-extrabold text-primary lh-1">
+            <div className="fs-5 fw-extrabold text-danger lh-1">
               {formatCurrency(grandTotal)}
             </div>
           </div>
@@ -533,13 +533,12 @@ export default function Billing() {
             return (
               <div
                 key={item.id}
-                className="p-3 rounded-3 border bg-light bg-opacity-50 position-relative transition-all"
-                style={{ borderLeft: '4px solid var(--primary)' }}
+                className="p-3 rounded-3 border bg-white shadow-sm position-relative transition-all"
               >
                 <div className="row g-2 align-items-center">
                   {/* # Index Pill */}
                   <div className="col-auto">
-                    <span className="badge bg-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
+                    <span className="badge bg-light text-dark border rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px' }}>
                       {index + 1}
                     </span>
                   </div>
@@ -702,7 +701,7 @@ export default function Billing() {
           </span>
           <div className="d-flex align-items-baseline gap-2">
             <span className="text-muted fw-bold small text-uppercase">Total Bill:</span>
-            <span className="fs-3 fw-extrabold text-primary">
+            <span className="fs-3 fw-extrabold text-danger">
               {formatCurrency(grandTotal)}
             </span>
           </div>

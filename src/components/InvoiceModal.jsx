@@ -307,8 +307,8 @@ Phone: ${settings.phone}`
                     <hr className="my-2" />
 
                     <div className="d-flex justify-content-between mb-2">
-                      <span className="fw-bold fs-6">Grand Total:</span>
-                      <span className="fw-bold fs-5 text-primary">{formatCurrency(inv.grandTotal)}</span>
+                      <span className="fw-bold fs-6 text-dark">Grand Total:</span>
+                      <span className="fw-extrabold fs-5 text-danger">{formatCurrency(inv.grandTotal)}</span>
                     </div>
 
                     <div className="d-flex justify-content-between mb-1 small text-success">

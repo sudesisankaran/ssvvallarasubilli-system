@@ -93,11 +93,11 @@ export default function Reports() {
     datasets: [{
       label: 'Daily Sales (₹)',
       data: sortedDates.length > 0 ? sortedDates.map(d => dateMap[d]) : [0],
-      borderColor: '#4f46e5',
-      backgroundColor: 'rgba(79, 70, 229, 0.1)',
+      borderColor: '#d32f2f',
+      backgroundColor: 'rgba(211, 47, 47, 0.08)',
       tension: 0.3,
       fill: true,
-      pointBackgroundColor: '#4f46e5'
+      pointBackgroundColor: '#d32f2f'
     }]
   };
 
