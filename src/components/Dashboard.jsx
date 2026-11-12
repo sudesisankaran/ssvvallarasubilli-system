@@ -19,7 +19,10 @@ import {
   UserPlus,
   ArrowDownLeft,
   ArrowUpRight,
-  Wallet
+  Wallet,
+  Package,
+  Activity,
+  ShoppingBag
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -47,6 +50,10 @@ export default function Dashboard() {
   const {
     invoices,
     customers,
+    services,
+    expenses,
+    purchases,
+    activityLogs,
     settings,
     setActiveTab,
     setViewingInvoice,
@@ -56,10 +63,14 @@ export default function Dashboard() {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Financial Metrics (Vyapar Style)
+  // Financial Metrics
   const totalSales = invoices.reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
   const totalPaid = invoices.reduce((sum, inv) => sum + (parseFloat(inv.paidAmount) || 0), 0);
   const pendingReceivables = invoices.reduce((sum, inv) => sum + (parseFloat(inv.balanceAmount) || 0), 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  const totalPurchases = purchases.reduce((sum, p) => sum + (parseFloat(p.totalAmount) || 0), 0);
+  const netProfit = totalSales - totalPurchases - totalExpenses;
+
   const todaySales = invoices
     .filter(inv => inv.date === todayStr)
     .reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
@@ -103,15 +114,11 @@ export default function Dashboard() {
   const barChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false }
-    },
+    plugins: { legend: { display: false } },
     scales: {
       y: {
         beginAtZero: true,
-        ticks: {
-          callback: (val) => '₹' + val.toLocaleString('en-IN')
-        }
+        ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') }
       }
     }
   };
@@ -119,7 +126,7 @@ export default function Dashboard() {
   // Recent 6 Invoices
   const recentInvoices = invoices.slice(0, 6);
 
-  // Top Debtors (Parties with Outstanding Dues)
+  // Top Debtors
   const debtorsMap = {};
   invoices.forEach(inv => {
     const bal = parseFloat(inv.balanceAmount) || 0;
@@ -149,8 +156,29 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* 1. VYAPAR AT-A-GLANCE FINANCIAL METRIC CARDS */}
+      {/* 1. SAAS EXECUTIVE FINANCIAL METRIC CARDS */}
       <div className="row g-3">
+        {/* Total Sales */}
+        <div className="col-xl-3 col-sm-6">
+          <div className="vyapar-kpi-card sales h-100">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
+                Total Sales
+              </span>
+              <span className="badge bg-danger text-white py-1 px-2 d-flex align-items-center gap-1">
+                <TrendingUp size={13} /> Revenue
+              </span>
+            </div>
+            <div className="fs-3 fw-extrabold text-dark my-1">
+              {formatCurrency(totalSales)}
+            </div>
+            <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
+              <span>Today: <strong>{formatCurrency(todaySales)}</strong></span>
+              <span>{invoices.length} Bills</span>
+            </div>
+          </div>
+        </div>
+
         {/* You'll Receive (Pending Receivables) */}
         <div className="col-xl-3 col-sm-6">
           <div className="vyapar-kpi-card receivable h-100">
@@ -170,27 +198,6 @@ export default function Dashboard() {
               <span className="text-primary fw-semibold cursor-pointer" onClick={() => setActiveTab('invoices')}>
                 View Invoices &rarr;
               </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Total Sales */}
-        <div className="col-xl-3 col-sm-6">
-          <div className="vyapar-kpi-card sales h-100">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
-                Total Sales
-              </span>
-              <span className="badge bg-danger text-white py-1 px-2 d-flex align-items-center gap-1">
-                <TrendingUp size={13} /> Revenue
-              </span>
-            </div>
-            <div className="fs-3 fw-extrabold text-dark my-1">
-              {formatCurrency(totalSales)}
-            </div>
-            <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
-              <span>Today's Sale: <strong>{formatCurrency(todaySales)}</strong></span>
-              <span>{invoices.length} Bills</span>
             </div>
           </div>
         </div>
@@ -216,36 +223,36 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Parties (Total Customers) */}
+        {/* Net Profit */}
         <div className="col-xl-3 col-sm-6">
-          <div className="vyapar-kpi-card parties h-100">
+          <div className="vyapar-kpi-card h-100" style={{ borderLeft: '4px solid #10b981' }}>
             <div className="d-flex justify-content-between align-items-center mb-2">
               <span className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem', letterSpacing: '0.5px' }}>
-                Total Parties
+                Estimated Net Profit
               </span>
-              <span className="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-2 d-flex align-items-center gap-1">
-                <Users size={13} /> Clients
+              <span className={`badge ${netProfit >= 0 ? 'bg-success text-white' : 'bg-danger text-white'} py-1 px-2`}>
+                Net Margin
               </span>
             </div>
-            <div className="fs-3 fw-extrabold text-dark my-1">
-              {customers.length}
+            <div className={`fs-3 fw-extrabold my-1 ${netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+              {formatCurrency(netProfit)}
             </div>
             <div className="small text-muted d-flex align-items-center justify-content-between mt-2 pt-2 border-top">
-              <span>Registered Accounts</span>
-              <span className="text-primary fw-semibold cursor-pointer" onClick={() => setActiveTab('customers')}>
-                Parties &rarr;
+              <span>Expenses: <strong>{formatCurrency(totalExpenses)}</strong></span>
+              <span className="text-primary fw-semibold cursor-pointer" onClick={() => setActiveTab('reports')}>
+                P&amp;L Report &rarr;
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. VYAPAR QUICK ACTIONS BAR */}
+      {/* 2. QUICK ACTIONS BAR */}
       <div className="bg-white border rounded-3 p-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div className="d-flex flex-wrap align-items-center gap-2">
           <button
             type="button"
-            className="btn btn-vyapar-sale fw-bold px-3 py-2 d-flex align-items-center gap-2"
+            className="btn btn-vyapar-sale fw-bold px-3 py-2 d-flex align-items-center gap-2 shadow-sm"
             onClick={() => {
               setEditingInvoice(null);
               setActiveTab('billing');
@@ -265,28 +272,44 @@ export default function Dashboard() {
           <button
             type="button"
             className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
-            onClick={() => setActiveTab('invoices')}
+            onClick={() => setActiveTab('products')}
           >
-            <Receipt size={15} className="me-1 d-inline" /> View All Invoices
+            <Package size={15} className="me-1 d-inline" /> + Products &amp; Stock
           </button>
 
           <button
             type="button"
             className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
-            onClick={() => setActiveTab('reports')}
+            onClick={() => setActiveTab('payments')}
           >
-            <TrendingUp size={15} className="me-1 d-inline" /> Sales Daybook
+            <CreditCard size={15} className="me-1 d-inline" /> Receive Payment
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
+            onClick={() => setActiveTab('purchases')}
+          >
+            <ShoppingBag size={15} className="me-1 d-inline" /> + Purchase
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary fw-semibold btn-sm px-3 py-2"
+            onClick={() => setActiveTab('expenses')}
+          >
+            <Wallet size={15} className="me-1 d-inline" /> + Expense
           </button>
         </div>
 
         <div className="d-flex align-items-center gap-2">
           <span className="small text-muted fw-semibold">
-            {settings.shopName || 'SSV VALLARASU'} • Flag Printing Counter
+            {settings.shopName || 'SSV VALLARASU'} • Rayakottai SP Complex
           </span>
         </div>
       </div>
 
-      {/* 3. MAIN SPLIT: RECENT TRANSACTIONS & SALES CHART */}
+      {/* 3. MAIN SPLIT: RECENT SALES & CHARTS */}
       <div className="row g-4">
         {/* Left: Recent Transactions (Sales Register) */}
         <div className="col-lg-8">
@@ -326,12 +349,8 @@ export default function Dashboard() {
 
                       return (
                         <tr key={inv.id}>
-                          <td className="small text-muted font-monospace">
-                            {formatDate(inv.date)}
-                          </td>
-                          <td className="fw-bold font-monospace text-dark">
-                            {inv.invoiceNumber}
-                          </td>
+                          <td className="small text-muted font-monospace">{formatDate(inv.date)}</td>
+                          <td className="fw-bold font-monospace text-dark">{inv.invoiceNumber}</td>
                           <td>
                             <div className="fw-semibold text-dark">{inv.customerName}</div>
                             {inv.customerPhone && (
@@ -345,9 +364,7 @@ export default function Dashboard() {
                               {inv.paymentStatus}
                             </span>
                           </td>
-                          <td className="text-end fw-bold text-dark">
-                            {formatCurrency(inv.grandTotal)}
-                          </td>
+                          <td className="text-end fw-bold text-dark">{formatCurrency(inv.grandTotal)}</td>
                           <td className="text-end">
                             {inv.balanceAmount > 0 ? (
                               <span className="text-danger fw-bold">{formatCurrency(inv.balanceAmount)}</span>
@@ -462,6 +479,33 @@ export default function Dashboard() {
             </div>
             <div className="card-body-custom" style={{ height: '220px' }}>
               <Bar data={barChartData} options={barChartOptions} />
+            </div>
+          </div>
+
+          {/* Activity Logs Stream */}
+          <div className="card-custom">
+            <div className="card-header-custom d-flex justify-content-between align-items-center">
+              <h3 className="fs-6 fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                <Activity size={16} className="text-primary" /> Live Audit Trail
+              </h3>
+              <span className="text-muted small" style={{ fontSize: '0.72rem' }}>Latest Actions</span>
+            </div>
+            <div className="p-3" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+              {activityLogs.length > 0 ? (
+                <div className="space-y-2">
+                  {activityLogs.slice(0, 5).map(log => (
+                    <div key={log.id} className="small border-bottom pb-1">
+                      <div className="d-flex justify-content-between">
+                        <strong className="text-dark">{log.action}</strong>
+                        <span className="text-muted" style={{ fontSize: '0.7rem' }}>{formatDate(log.timestamp)}</span>
+                      </div>
+                      <div className="text-muted text-truncate" style={{ fontSize: '0.74rem' }}>{log.details}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted small text-center py-2">No activity recorded yet.</div>
+              )}
             </div>
           </div>
         </div>

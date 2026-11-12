@@ -4,10 +4,18 @@ import { formatCurrency, formatDate } from '../utils/constants';
 import {
   FileSpreadsheet,
   TrendingUp,
+  TrendingDown,
   CheckCircle2,
   AlertCircle,
   Calendar,
-  BarChart3
+  BarChart3,
+  DollarSign,
+  Download,
+  Filter,
+  PieChart as PieIcon,
+  Receipt,
+  Layers,
+  Users
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -15,18 +23,20 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
   ArcElement
 } from 'chart.js';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -34,417 +44,485 @@ ChartJS.register(
 );
 
 export default function Reports() {
-  const { invoices, addToast } = useShop();
-  const [dateRange, setDateRange] = useState('thisMonth');
+  const { invoices, purchases, expenses, customers, services, addToast } = useShop();
+  const [reportType, setReportType] = useState('pl'); // 'pl', 'sales', 'purchases', 'expenses', 'gst', 'aging', 'products'
+  const [dateRange, setDateRange] = useState('all'); // 'today', 'thisMonth', 'thisYear', 'all'
 
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
 
-  const filteredInvoices = invoices.filter(inv => {
-    const invDate = new Date(inv.date);
-    if (dateRange === 'today') {
-      return inv.date === todayStr;
-    } else if (dateRange === 'last7Days') {
-      const diff = (now - invDate) / (1000 * 60 * 60 * 24);
-      return diff >= 0 && diff <= 7;
-    } else if (dateRange === 'thisMonth') {
-      return invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear();
-    } else if (dateRange === 'thisYear') {
-      return invDate.getFullYear() === now.getFullYear();
-    }
-    return true;
-  });
+  const filterByDate = (items) => {
+    return items.filter(item => {
+      if (!item.date) return true;
+      const d = new Date(item.date);
+      if (dateRange === 'today') return item.date === todayStr;
+      if (dateRange === 'thisMonth') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      if (dateRange === 'thisYear') return d.getFullYear() === now.getFullYear();
+      return true;
+    });
+  };
 
-  // KPI Calculations
-  const periodRevenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
-  const totalCollected = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.paidAmount) || 0), 0);
-  const pendingPayments = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balanceAmount) || 0), 0);
+  const filteredInvoices = filterByDate(invoices);
+  const filteredPurchases = filterByDate(purchases);
+  const filteredExpenses = filterByDate(expenses);
 
-  const todaySales = invoices
-    .filter(inv => inv.date === todayStr)
-    .reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
+  // Financial Figures
+  const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
+  const totalReceived = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.paidAmount) || 0), 0);
+  const totalReceivables = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balanceAmount) || 0), 0);
+  const totalPurchases = filteredPurchases.reduce((sum, p) => sum + (parseFloat(p.totalAmount) || 0), 0);
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  const grossProfit = totalRevenue - totalPurchases;
+  const netProfit = totalRevenue - totalPurchases - totalExpenses;
 
-  const weeklySales = invoices
-    .filter(inv => {
-      const diff = (now - new Date(inv.date)) / (1000 * 60 * 60 * 24);
-      return diff >= 0 && diff <= 7;
-    })
-    .reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
-
-  const monthlySales = invoices
-    .filter(inv => {
-      const d = new Date(inv.date);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
-
-  const yearlySales = invoices
-    .filter(inv => new Date(inv.date).getFullYear() === now.getFullYear())
-    .reduce((sum, inv) => sum + (parseFloat(inv.grandTotal) || 0), 0);
-
-  // Line Chart: Daily Sales Trend
-  const dateMap = {};
-  filteredInvoices.forEach(inv => {
-    dateMap[inv.date] = (dateMap[inv.date] || 0) + (parseFloat(inv.grandTotal) || 0);
-  });
-  const sortedDates = Object.keys(dateMap).sort();
-  const lineChartData = {
-    labels: sortedDates.length > 0 ? sortedDates.map(d => formatDate(d)) : ['No Data'],
+  // Chart: P&L Summary Bar Chart
+  const plBarData = {
+    labels: ['Sales Revenue', 'Raw Material Purchases', 'Operating Expenses', 'Net Profit'],
     datasets: [{
-      label: 'Daily Sales (₹)',
-      data: sortedDates.length > 0 ? sortedDates.map(d => dateMap[d]) : [0],
-      borderColor: '#d32f2f',
-      backgroundColor: 'rgba(211, 47, 47, 0.08)',
-      tension: 0.3,
-      fill: true,
-      pointBackgroundColor: '#d32f2f'
+      label: 'Financial Flow (₹)',
+      data: [totalRevenue, totalPurchases, totalExpenses, Math.max(0, netProfit)],
+      backgroundColor: ['#2563eb', '#f59e0b', '#dc2626', '#10b981'],
+      borderRadius: 6
     }]
   };
 
-  // Donut Chart: Category Share
-  let flagSales = 0;
-  let otherSales = 0;
+  // Product Sales Map
+  const productSalesMap = {};
   filteredInvoices.forEach(inv => {
     (inv.items || []).forEach(item => {
-      if (item.category === 'Flag Printing') {
-        flagSales += parseFloat(item.amount) || 0;
-      } else {
-        otherSales += parseFloat(item.amount) || 0;
+      const name = item.serviceName || 'Standard Item';
+      if (!productSalesMap[name]) {
+        productSalesMap[name] = { name, qty: 0, revenue: 0 };
       }
+      productSalesMap[name].qty += (parseFloat(item.quantity) || 1);
+      productSalesMap[name].revenue += (parseFloat(item.amount) || 0);
     });
   });
+  const productSalesList = Object.values(productSalesMap).sort((a, b) => b.revenue - a.revenue);
 
-  const donutChartData = {
-    labels: ['Flag Printing', 'Other Printing Services'],
-    datasets: [{
-      data: [flagSales, otherSales],
-      backgroundColor: ['#4f46e5', '#38bdf8'],
-      borderWidth: 2,
-      borderColor: '#ffffff'
-    }]
-  };
-
-  // Customer-wise breakdown
-  const customerMap = {};
-  filteredInvoices.forEach(inv => {
-    const name = inv.customerName || 'Unknown';
-    if (!customerMap[name]) {
-      customerMap[name] = { name, count: 0, total: 0, collected: 0, due: 0, phone: inv.customerPhone };
+  // Customer Outstanding Aging Map
+  const debtorsList = [];
+  customers.forEach(cust => {
+    const custInvoices = invoices.filter(i => i.customerId === cust.id || i.customerName === cust.name);
+    const balance = custInvoices.reduce((sum, i) => sum + (parseFloat(i.balanceAmount) || 0), 0);
+    if (balance > 0) {
+      debtorsList.push({
+        name: cust.name,
+        phone: cust.phone || '-',
+        balance,
+        invoiceCount: custInvoices.length
+      });
     }
-    customerMap[name].count++;
-    customerMap[name].total += parseFloat(inv.grandTotal) || 0;
-    customerMap[name].collected += parseFloat(inv.paidAmount) || 0;
-    customerMap[name].due += parseFloat(inv.balanceAmount) || 0;
   });
-  const sortedCustomers = Object.values(customerMap).sort((a, b) => b.total - a.total);
+  debtorsList.sort((a, b) => b.balance - a.balance);
 
-  // Service-wise breakdown
-  const serviceMap = {};
-  filteredInvoices.forEach(inv => {
-    (inv.items || []).forEach(item => {
-      const srvName = item.serviceName || 'Custom';
-      if (!serviceMap[srvName]) {
-        serviceMap[srvName] = { name: srvName, category: item.category, qty: 0, unit: item.unit, revenue: 0 };
-      }
-      serviceMap[srvName].qty += parseFloat(item.quantity) || 0;
-      serviceMap[srvName].revenue += parseFloat(item.amount) || 0;
-    });
-  });
-  const sortedServices = Object.values(serviceMap).sort((a, b) => b.revenue - a.revenue);
-
-  // CSV Export
+  // Export CSV
   const handleExportCSV = () => {
-    if (filteredInvoices.length === 0) {
-      addToast('No invoices to export for selected range.', 'warning');
-      return;
+    let csvContent = 'data:text/csv;charset=utf-8,';
+    if (reportType === 'sales') {
+      csvContent += 'Invoice No,Date,Customer,Grand Total,Paid,Balance,Status\n';
+      filteredInvoices.forEach(i => {
+        csvContent += `"${i.invoiceNumber}","${i.date}","${i.customerName}",${i.grandTotal},${i.paidAmount || 0},${i.balanceAmount || 0},"${i.paymentStatus}"\n`;
+      });
+    } else if (reportType === 'purchases') {
+      csvContent += 'Bill No,Date,Supplier,Total Amount,Status\n';
+      filteredPurchases.forEach(p => {
+        csvContent += `"${p.billNumber}","${p.date}","${p.supplierName}",${p.totalAmount},"${p.paymentStatus}"\n`;
+      });
+    } else if (reportType === 'expenses') {
+      csvContent += 'Category,Date,Paid To,Amount,Payment Mode,Note\n';
+      filteredExpenses.forEach(e => {
+        csvContent += `"${e.category}","${e.date}","${e.paidTo || ''}",${e.amount},"${e.paymentMode}","${e.note || ''}"\n`;
+      });
+    } else {
+      csvContent += 'Metric,Amount\n';
+      csvContent += `Total Sales Revenue,${totalRevenue}\n`;
+      csvContent += `Total Purchases,${totalPurchases}\n`;
+      csvContent += `Operating Expenses,${totalExpenses}\n`;
+      csvContent += `Gross Profit,${grossProfit}\n`;
+      csvContent += `Net Profit,${netProfit}\n`;
     }
 
-    const headers = [
-      'Invoice Number',
-      'Date',
-      'Customer Name',
-      'Customer Phone',
-      'Order Status',
-      'Payment Status',
-      'Payment Mode',
-      'Subtotal (INR)',
-      'Discount (INR)',
-      'GST Rate (%)',
-      'CGST (INR)',
-      'SGST (INR)',
-      'IGST (INR)',
-      'Grand Total (INR)',
-      'Paid Amount (INR)',
-      'Balance Due (INR)'
-    ];
-
-    const rows = filteredInvoices.map(inv => [
-      `"${inv.invoiceNumber}"`,
-      `"${inv.date}"`,
-      `"${(inv.customerName || '').replace(/"/g, '""')}"`,
-      `"${inv.customerPhone || ''}"`,
-      `"${inv.orderStatus || ''}"`,
-      `"${inv.paymentStatus || ''}"`,
-      `"${inv.paymentMode || ''}"`,
-      inv.subtotal.toFixed(2),
-      inv.discountAmount.toFixed(2),
-      inv.gstRate,
-      inv.cgstAmount.toFixed(2),
-      inv.sgstAmount.toFixed(2),
-      inv.igstAmount.toFixed(2),
-      inv.grandTotal.toFixed(2),
-      inv.paidAmount.toFixed(2),
-      inv.balanceAmount.toFixed(2)
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `SSV_VALLARASU_Sales_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `SSV_${reportType.toUpperCase()}_REPORT_${todayStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    addToast('Sales report exported to CSV successfully!', 'success');
+    addToast('Report CSV downloaded!', 'success');
   };
 
   return (
-    <div className="space-y-4">
-      {/* Top Header Card */}
-      <div className="card-custom mb-3">
-        <div className="card-body-custom py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
-          <div>
-            <h2 className="mb-0 fs-5 fw-bold text-dark">Financial Analytics &amp; Reports</h2>
-            <small className="text-muted">Revenue breakdowns, collection stats and CSV export</small>
+    <div className="space-y-3">
+      {/* 1. TOP HEADER & PERIOD SELECTOR */}
+      <div className="bg-white border rounded-3 p-3 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div className="d-flex align-items-center gap-3">
+          <div className="p-2 bg-primary text-white rounded-3">
+            <BarChart3 size={24} />
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <select
-              className="form-select form-select-sm w-auto"
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-            >
-              <option value="thisMonth">This Month</option>
-              <option value="today">Today</option>
-              <option value="last7Days">Past 7 Days</option>
-              <option value="thisYear">This Year</option>
-              <option value="all">All Time</option>
-            </select>
+          <div>
+            <h1 className="fs-5 fw-bold text-dark mb-0">Financial Analytics &amp; Reports</h1>
+            <div className="text-muted small">
+              Real-time Profit &amp; Loss, Sales daybook, GST tax summary, and Customer aging
+            </div>
+          </div>
+        </div>
+
+        <div className="d-flex align-items-center gap-2">
+          {/* Period Filter */}
+          <div className="btn-group btn-group-sm">
             <button
               type="button"
-              className="btn btn-sm btn-success fw-bold"
-              onClick={handleExportCSV}
+              className={`btn ${dateRange === 'all' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setDateRange('all')}
             >
-              <FileSpreadsheet size={15} className="me-1" /> Export CSV
+              All Time
+            </button>
+            <button
+              type="button"
+              className={`btn ${dateRange === 'today' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setDateRange('today')}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              className={`btn ${dateRange === 'thisMonth' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setDateRange('thisMonth')}
+            >
+              This Month
+            </button>
+            <button
+              type="button"
+              className={`btn ${dateRange === 'thisYear' ? 'btn-dark' : 'btn-outline-secondary'}`}
+              onClick={() => setDateRange('thisYear')}
+            >
+              This Year
             </button>
           </div>
+
+          <button
+            type="button"
+            className="btn btn-outline-success btn-sm fw-bold px-3 d-flex align-items-center gap-1 shadow-sm"
+            onClick={handleExportCSV}
+          >
+            <Download size={14} /> Export CSV
+          </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="row g-3">
-        <div className="col-md-3 col-sm-6">
-          <div className="stat-card accent-primary">
-            <div className="stat-header">
-              <span className="stat-title">Period Revenue</span>
-              <div className="stat-icon primary"><TrendingUp size={20} /></div>
-            </div>
-            <div className="stat-value">{formatCurrency(periodRevenue)}</div>
-            <div className="stat-subtext">Total billed in period</div>
-          </div>
-        </div>
-
-        <div className="col-md-3 col-sm-6">
-          <div className="stat-card accent-success">
-            <div className="stat-header">
-              <span className="stat-title">Total Collected</span>
-              <div className="stat-icon success"><CheckCircle2 size={20} /></div>
-            </div>
-            <div className="stat-value text-success">{formatCurrency(totalCollected)}</div>
-            <div className="stat-subtext">Actual payments received</div>
-          </div>
-        </div>
-
-        <div className="col-md-3 col-sm-6">
-          <div className="stat-card accent-danger">
-            <div className="stat-header">
-              <span className="stat-title">Pending Due</span>
-              <div className="stat-icon danger"><AlertCircle size={20} /></div>
-            </div>
-            <div className="stat-value text-danger">{formatCurrency(pendingPayments)}</div>
-            <div className="stat-subtext">Receivables to collect</div>
-          </div>
-        </div>
-
-        <div className="col-md-3 col-sm-6">
-          <div className="stat-card accent-purple">
-            <div className="stat-header">
-              <span className="stat-title">Today's Sales</span>
-              <div className="stat-icon purple"><Calendar size={20} /></div>
-            </div>
-            <div className="stat-value">{formatCurrency(todaySales)}</div>
-            <div className="stat-subtext">Today's total bookings</div>
-          </div>
-        </div>
+      {/* 2. REPORT NAVIGATION TABS */}
+      <div className="bg-white border rounded-3 p-2 shadow-sm d-flex flex-wrap gap-1">
+        <button
+          type="button"
+          className={`btn btn-sm ${reportType === 'pl' ? 'btn-primary' : 'btn-light text-dark'} fw-bold px-3`}
+          onClick={() => setReportType('pl')}
+        >
+          Profit &amp; Loss Statement
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${reportType === 'sales' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setReportType('sales')}
+        >
+          Sales Register ({filteredInvoices.length})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${reportType === 'purchases' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setReportType('purchases')}
+        >
+          Purchase Report ({filteredPurchases.length})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${reportType === 'expenses' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setReportType('expenses')}
+        >
+          Expenses Report ({filteredExpenses.length})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${reportType === 'aging' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setReportType('aging')}
+        >
+          Customer Outstanding Aging ({debtorsList.length})
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${reportType === 'products' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setReportType('products')}
+        >
+          Product Sales Breakdown
+        </button>
       </div>
 
-      {/* Overview Cards for Week, Month, Year */}
-      <div className="row g-3">
-        <div className="col-md-4">
-          <div className="p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center">
-            <div>
-              <div className="small text-muted fw-bold">WEEKLY SALES</div>
-              <div className="fs-5 fw-bold text-dark">{formatCurrency(weeklySales)}</div>
+      {/* 3. REPORT VIEWS */}
+      {/* VIEW A: PROFIT & LOSS */}
+      {reportType === 'pl' && (
+        <div className="space-y-3">
+          {/* KPI Strip */}
+          <div className="row g-3">
+            <div className="col-md-3 col-sm-6">
+              <div className="p-3 bg-white border rounded-3 shadow-sm">
+                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem' }}>Total Sales (A)</div>
+                <div className="fs-4 fw-extrabold text-primary">{formatCurrency(totalRevenue)}</div>
+              </div>
             </div>
-            <Calendar size={28} className="text-primary opacity-50" />
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center">
-            <div>
-              <div className="small text-muted fw-bold">MONTHLY SALES</div>
-              <div className="fs-5 fw-bold text-dark">{formatCurrency(monthlySales)}</div>
+            <div className="col-md-3 col-sm-6">
+              <div className="p-3 bg-white border rounded-3 shadow-sm">
+                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem' }}>Purchases Cost (B)</div>
+                <div className="fs-4 fw-extrabold text-warning">{formatCurrency(totalPurchases)}</div>
+              </div>
             </div>
-            <BarChart3 size={28} className="text-primary opacity-50" />
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="p-3 bg-white border rounded shadow-sm d-flex justify-content-between align-items-center">
-            <div>
-              <div className="small text-muted fw-bold">YEARLY SALES</div>
-              <div className="fs-5 fw-bold text-dark">{formatCurrency(yearlySales)}</div>
+            <div className="col-md-3 col-sm-6">
+              <div className="p-3 bg-white border rounded-3 shadow-sm">
+                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem' }}>Overhead Expenses (C)</div>
+                <div className="fs-4 fw-extrabold text-danger">{formatCurrency(totalExpenses)}</div>
+              </div>
             </div>
-            <TrendingUp size={28} className="text-primary opacity-50" />
+            <div className="col-md-3 col-sm-6">
+              <div className="p-3 bg-white border rounded-3 shadow-sm">
+                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: '0.72rem' }}>Net Profit (A - B - C)</div>
+                <div className={`fs-4 fw-extrabold ${netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {formatCurrency(netProfit)}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Charts */}
-      <div className="row g-3">
-        <div className="col-lg-8">
-          <div className="card-custom h-100 mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Daily Sales Trend</h2>
+          {/* Chart & Statement Table */}
+          <div className="row g-3">
+            <div className="col-lg-7">
+              <div className="card-custom h-100 p-3">
+                <h3 className="fs-6 fw-bold mb-3">Profit &amp; Loss Breakdown</h3>
+                <div style={{ height: '240px' }}>
+                  <Bar data={plBarData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+                </div>
+              </div>
             </div>
-            <div className="card-body-custom" style={{ height: '300px' }}>
-              <Line
-                data={lineChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: { y: { beginAtZero: true } }
-                }}
-              />
-            </div>
-          </div>
-        </div>
 
-        <div className="col-lg-4">
-          <div className="card-custom h-100 mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Category Revenue Share</h2>
-            </div>
-            <div className="card-body-custom d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-              {flagSales + otherSales === 0 ? (
-                <div className="text-center text-muted small">No revenue data in this period</div>
-              ) : (
-                <Doughnut
-                  data={donutChartData}
-                  options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tables */}
-      <div className="row g-3">
-        {/* Customer-wise */}
-        <div className="col-lg-6">
-          <div className="card-custom mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Customer-wise Sales</h2>
-            </div>
-            <div className="table-custom-wrapper" style={{ maxHeight: '340px' }}>
-              {sortedCustomers.length === 0 ? (
-                <div className="text-center py-4 text-muted small">No customer sales recorded for this period</div>
-              ) : (
-                <table className="table-custom">
-                  <thead>
-                    <tr>
-                      <th>Customer</th>
-                      <th className="text-center">Invoices</th>
-                      <th>Total Sales</th>
-                      <th>Paid</th>
-                      <th>Due</th>
-                    </tr>
-                  </thead>
+            <div className="col-lg-5">
+              <div className="card-custom h-100 p-3">
+                <h3 className="fs-6 fw-bold mb-3">P&amp;L Financial Summary</h3>
+                <table className="table table-sm vyapar-table mb-0">
                   <tbody>
-                    {sortedCustomers.map(c => (
-                      <tr key={c.name}>
-                        <td>
-                          <div className="fw-bold text-dark">{c.name}</div>
-                          <small className="text-muted">{c.phone || '-'}</small>
-                        </td>
-                        <td className="text-center">
-                          <span className="badge bg-light text-dark border">{c.count} Bills</span>
-                        </td>
-                        <td className="fw-bold">{formatCurrency(c.total)}</td>
-                        <td className="text-success">{formatCurrency(c.collected)}</td>
-                        <td className={c.due > 0 ? 'text-danger fw-bold' : 'text-muted'}>
-                          {formatCurrency(c.due)}
-                        </td>
-                      </tr>
-                    ))}
+                    <tr>
+                      <td className="fw-semibold">Gross Sales Revenue:</td>
+                      <td className="text-end fw-bold text-primary">{formatCurrency(totalRevenue)}</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Less: Raw Materials Purchased:</td>
+                      <td className="text-end text-warning">-{formatCurrency(totalPurchases)}</td>
+                    </tr>
+                    <tr className="border-top">
+                      <td className="fw-bold">Gross Margin:</td>
+                      <td className="text-end fw-bold">{formatCurrency(grossProfit)}</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Less: Operating Expenses &amp; Rent:</td>
+                      <td className="text-end text-danger">-{formatCurrency(totalExpenses)}</td>
+                    </tr>
+                    <tr className="border-top-2 table-light">
+                      <td className="fw-extrabold fs-6">Net Profit / Surplus:</td>
+                      <td className={`text-end fw-extrabold fs-6 ${netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {formatCurrency(netProfit)}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
-              )}
+              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Item-wise Sales */}
-        <div className="col-lg-6">
-          <div className="card-custom mb-0">
-            <div className="card-header-custom">
-              <h2 className="fs-6 fw-bold mb-0">Item-wise Sales Breakdown</h2>
-            </div>
-            <div className="table-custom-wrapper" style={{ maxHeight: '340px' }}>
-              {sortedServices.length === 0 ? (
-                <div className="text-center py-4 text-muted small">No product sales recorded for this period</div>
-              ) : (
-                <table className="table-custom">
-                  <thead>
-                    <tr>
-                      <th>Item Name</th>
-                      <th>Category</th>
-                      <th className="text-center">Qty</th>
-                      <th className="text-end">Total Revenue</th>
+      {/* VIEW B: SALES REGISTER */}
+      {reportType === 'sales' && (
+        <div className="card-custom">
+          <div className="table-responsive">
+            <table className="table vyapar-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Bill #</th>
+                  <th>Customer Name</th>
+                  <th className="text-end">Grand Total</th>
+                  <th className="text-end">Paid Amount</th>
+                  <th className="text-end">Balance</th>
+                  <th className="text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInvoices.length > 0 ? (
+                  filteredInvoices.map((i, idx) => (
+                    <tr key={i.id}>
+                      <td className="small text-muted">{idx + 1}</td>
+                      <td className="small font-monospace text-muted">{formatDate(i.date)}</td>
+                      <td className="fw-bold font-monospace text-dark">{i.invoiceNumber}</td>
+                      <td className="fw-semibold">{i.customerName}</td>
+                      <td className="text-end fw-bold">{formatCurrency(i.grandTotal)}</td>
+                      <td className="text-end text-success">{formatCurrency(i.paidAmount || 0)}</td>
+                      <td className="text-end text-danger fw-bold">{formatCurrency(i.balanceAmount || 0)}</td>
+                      <td className="text-center">
+                        <span className={`badge ${i.paymentStatus === 'Paid' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} border`}>
+                          {i.paymentStatus}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {sortedServices.map(s => (
-                      <tr key={s.name}>
-                        <td className="fw-bold text-dark">{s.name}</td>
-                        <td>
-                          <span className={`badge ${s.category === 'Flag Printing' ? 'bg-primary-subtle text-primary' : 'bg-secondary-subtle text-secondary'} small`}>
-                            {s.category}
-                          </span>
-                        </td>
-                        <td className="text-center fw-semibold">{s.qty} {s.unit}</td>
-                        <td className="fw-bold text-end text-primary">{formatCurrency(s.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                  ))
+                ) : (
+                  <tr><td colSpan="8" className="text-center py-4 text-muted">No sales invoices in this range.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* VIEW C: PURCHASE REPORT */}
+      {reportType === 'purchases' && (
+        <div className="card-custom">
+          <div className="table-responsive">
+            <table className="table vyapar-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Purchase Bill #</th>
+                  <th>Supplier Name</th>
+                  <th>Materials</th>
+                  <th className="text-end">Bill Amount</th>
+                  <th className="text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPurchases.length > 0 ? (
+                  filteredPurchases.map((p, idx) => (
+                    <tr key={p.id}>
+                      <td className="small text-muted">{idx + 1}</td>
+                      <td className="small font-monospace text-muted">{formatDate(p.date)}</td>
+                      <td className="fw-bold font-monospace">{p.billNumber}</td>
+                      <td className="fw-semibold">{p.supplierName}</td>
+                      <td className="small text-muted">
+                        {(p.items || []).map(i => `${i.quantity} ${i.unit} ${i.productName}`).join(', ')}
+                      </td>
+                      <td className="text-end fw-bold">{formatCurrency(p.totalAmount)}</td>
+                      <td className="text-center"><span className="badge bg-light text-dark border">{p.paymentStatus}</span></td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="7" className="text-center py-4 text-muted">No purchases in this range.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW D: EXPENSES REPORT */}
+      {reportType === 'expenses' && (
+        <div className="card-custom">
+          <div className="table-responsive">
+            <table className="table vyapar-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Recipient / Paid To</th>
+                  <th>Description</th>
+                  <th className="text-end">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredExpenses.length > 0 ? (
+                  filteredExpenses.map((e, idx) => (
+                    <tr key={e.id}>
+                      <td className="small text-muted">{idx + 1}</td>
+                      <td className="small font-monospace text-muted">{formatDate(e.date)}</td>
+                      <td><span className="badge bg-light text-danger border fw-bold">{e.category}</span></td>
+                      <td className="fw-semibold">{e.paidTo || '-'}</td>
+                      <td className="small text-muted">{e.note || '-'}</td>
+                      <td className="text-end fw-bold text-danger">{formatCurrency(e.amount)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="6" className="text-center py-4 text-muted">No expenses recorded in this period.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW E: CUSTOMER OUTSTANDING AGING */}
+      {reportType === 'aging' && (
+        <div className="card-custom">
+          <div className="table-responsive">
+            <table className="table vyapar-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Customer / Party Name</th>
+                  <th>Phone Number</th>
+                  <th>Unsettled Bills</th>
+                  <th className="text-end">Outstanding Balance Due</th>
+                </tr>
+              </thead>
+              <tbody>
+                {debtorsList.length > 0 ? (
+                  debtorsList.map((d, idx) => (
+                    <tr key={idx}>
+                      <td className="small text-muted">{idx + 1}</td>
+                      <td className="fw-bold text-dark">{d.name}</td>
+                      <td className="font-monospace small text-muted">{d.phone}</td>
+                      <td><span className="badge bg-light text-dark border">{d.invoiceCount} Bills</span></td>
+                      <td className="text-end fw-extrabold text-danger">{formatCurrency(d.balance)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="5" className="text-center py-4 text-success fw-bold">No outstanding customer dues!</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW F: PRODUCT SALES BREAKDOWN */}
+      {reportType === 'products' && (
+        <div className="card-custom">
+          <div className="table-responsive">
+            <table className="table vyapar-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Product / Service Title</th>
+                  <th className="text-center">Total Quantity Sold</th>
+                  <th className="text-end">Total Revenue Generated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productSalesList.length > 0 ? (
+                  productSalesList.map((p, idx) => (
+                    <tr key={idx}>
+                      <td className="small text-muted">{idx + 1}</td>
+                      <td className="fw-bold text-dark">{p.name}</td>
+                      <td className="text-center fw-bold">{p.qty}</td>
+                      <td className="text-end fw-bold text-primary">{formatCurrency(p.revenue)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr><td colSpan="4" className="text-center py-4 text-muted">No product sales yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

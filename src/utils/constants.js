@@ -7,8 +7,49 @@ export const STORAGE_KEYS = {
   SETTINGS: 'ssv_shop_settings',
   SERVICES: 'ssv_printing_services',
   CUSTOMERS: 'ssv_customers_list',
-  INVOICES: 'ssv_invoices_list'
+  INVOICES: 'ssv_invoices_list',
+  QUOTATIONS: 'ssv_quotations_list',
+  CREDIT_NOTES: 'ssv_credit_notes_list',
+  DEBIT_NOTES: 'ssv_debit_notes_list',
+  SUPPLIERS: 'ssv_suppliers_list',
+  PURCHASES: 'ssv_purchases_list',
+  EXPENSES: 'ssv_expenses_list',
+  STAFF: 'ssv_staff_list',
+  ACTIVITY_LOGS: 'ssv_activity_logs',
+  NOTIFICATIONS: 'ssv_notifications',
+  BRANCHES: 'ssv_branches_list'
 };
+
+export const PRODUCT_CATEGORIES = [
+  'Flag Printing',
+  'T-Shirt Printing',
+  'Flex Banner Printing',
+  'Vinyl & Sticker Printing',
+  'Visiting Cards & Stationery',
+  'Display Boards & Signage',
+  'Sublimation & Gifts',
+  'Raw Materials & Fabrics'
+];
+
+export const EXPENSE_CATEGORIES = [
+  'Printing Raw Materials & Inks',
+  'Fabrics & Blank T-Shirts',
+  'Shop Rent',
+  'Electricity & Utility Bills',
+  'Machine Repair & Maintenance',
+  'Staff Salaries & Wages',
+  'Transportation & Delivery',
+  'Tea & Refreshments',
+  'Marketing & Advertising',
+  'Miscellaneous'
+];
+
+export const STAFF_ROLES = [
+  { id: 'Admin', title: 'Administrator / Owner', permissions: ['all'] },
+  { id: 'Billing Operator', title: 'Billing Operator', permissions: ['billing', 'invoices', 'customers', 'payments'] },
+  { id: 'Designer', title: 'Graphic & Flag Designer', permissions: ['orders', 'products'] },
+  { id: 'Production Manager', title: 'Printing & Production Head', permissions: ['orders', 'inventory', 'purchases'] }
+];
 
 export const DEFAULT_SETTINGS = {
   shopName: 'SSV VALLARASU FLAG & T SHIRT PRINTING',

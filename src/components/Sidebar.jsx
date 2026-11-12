@@ -11,7 +11,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Flag,
-  Cloud
+  Package,
+  CreditCard,
+  ShoppingBag,
+  Wallet,
+  Users2
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -62,8 +66,8 @@ export default function Sidebar() {
               <img
                 src={settings.logoUrl}
                 alt="Shop Logo"
-                className="brand-logo-img rounded-3"
-                style={{ width: '40px', height: '40px', objectFit: 'contain', background: '#fff', padding: '3px' }}
+                className="brand-logo-img rounded-circle"
+                style={{ width: '38px', height: '38px', objectFit: 'cover', background: '#fff', border: '1.5px solid #fff' }}
               />
             ) : (
               <div className="brand-logo-icon" style={{ background: 'linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%)' }}>
@@ -73,7 +77,7 @@ export default function Sidebar() {
             <div className="brand-details">
               <span className="brand-name">{settings.shopName || 'SSV VALLARASU'}</span>
               <span className="brand-sub" style={{ color: '#fca5a5' }}>
-                {settings.shopSubtitle || 'FLAGS & DIGITAL PRINTING'}
+                {settings.shopSubtitle || 'FLAG & T SHIRT PRINTING'}
               </span>
             </div>
           </div>
@@ -92,7 +96,7 @@ export default function Sidebar() {
         <div className="px-3 pt-3 pb-1">
           <button
             type="button"
-            className="btn btn-vyapar-sale w-100 py-2 d-flex align-items-center justify-content-center gap-2"
+            className="btn btn-vyapar-sale w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm"
             onClick={handleNewSale}
             title="Add Sale (Create Bill)"
           >
@@ -101,9 +105,10 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* Sidebar Body */}
+        {/* Sidebar Body with Clean Categorized Navigation */}
         <div className="sidebar-body">
-          <div className="section-label">General</div>
+          {/* Group 1: Sales & Customers */}
+          <div className="section-label">Sales &amp; Point of Sale</div>
           <ul className="nav flex-column mb-2">
             <li className="nav-item">
               <button
@@ -113,6 +118,33 @@ export default function Sidebar() {
               >
                 <LayoutDashboard className="nav-icon" size={18} />
                 <span className="nav-text">Dashboard</span>
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'billing' ? 'active' : ''}`}
+                onClick={() => handleNavClick('billing')}
+              >
+                <PlusCircle className="nav-icon" size={18} />
+                <span className="nav-text">Point of Sale (POS)</span>
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'invoices' ? 'active' : ''}`}
+                onClick={() => handleNavClick('invoices')}
+              >
+                <Receipt className="nav-icon" size={18} />
+                <span className="nav-text">Invoices &amp; Estimates</span>
+                {pendingBillsCount > 0 && (
+                  <span className="badge-nav bg-danger text-white ms-auto" title="Pending Dues">
+                    {pendingBillsCount} Due
+                  </span>
+                )}
               </button>
             </li>
 
@@ -129,20 +161,30 @@ export default function Sidebar() {
                 )}
               </button>
             </li>
+          </ul>
+
+          {/* Group 2: Inventory & Operations */}
+          <div className="section-label">Inventory &amp; Operations</div>
+          <ul className="nav flex-column mb-2">
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'products' ? 'active' : ''}`}
+                onClick={() => handleNavClick('products')}
+              >
+                <Package className="nav-icon" size={18} />
+                <span className="nav-text">Products &amp; Stock</span>
+              </button>
+            </li>
 
             <li className="nav-item">
               <button
                 type="button"
-                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'invoices' ? 'active' : ''}`}
-                onClick={() => handleNavClick('invoices')}
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'purchases' ? 'active' : ''}`}
+                onClick={() => handleNavClick('purchases')}
               >
-                <Receipt className="nav-icon" size={18} />
-                <span className="nav-text">Sales / Invoices</span>
-                {pendingBillsCount > 0 && (
-                  <span className="badge-nav bg-danger text-white ms-auto" title="Pending Dues">
-                    {pendingBillsCount} Due
-                  </span>
-                )}
+                <ShoppingBag className="nav-icon" size={18} />
+                <span className="nav-text">Purchases &amp; Vendors</span>
               </button>
             </li>
 
@@ -158,8 +200,31 @@ export default function Sidebar() {
             </li>
           </ul>
 
-          <div className="section-label">Accounting &amp; Setup</div>
-          <ul className="nav flex-column">
+          {/* Group 3: Accounting & Reports */}
+          <div className="section-label">Accounts &amp; Finance</div>
+          <ul className="nav flex-column mb-2">
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'payments' ? 'active' : ''}`}
+                onClick={() => handleNavClick('payments')}
+              >
+                <CreditCard className="nav-icon" size={18} />
+                <span className="nav-text">Payments &amp; Dues</span>
+              </button>
+            </li>
+
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'expenses' ? 'active' : ''}`}
+                onClick={() => handleNavClick('expenses')}
+              >
+                <Wallet className="nav-icon" size={18} />
+                <span className="nav-text">Expenses &amp; Rent</span>
+              </button>
+            </li>
+
             <li className="nav-item">
               <button
                 type="button"
@@ -167,7 +232,22 @@ export default function Sidebar() {
                 onClick={() => handleNavClick('reports')}
               >
                 <BarChart3 className="nav-icon" size={18} />
-                <span className="nav-text">Reports &amp; Daybook</span>
+                <span className="nav-text">Reports &amp; P&amp;L</span>
+              </button>
+            </li>
+          </ul>
+
+          {/* Group 4: Administration & Setup */}
+          <div className="section-label">System &amp; Administration</div>
+          <ul className="nav flex-column">
+            <li className="nav-item">
+              <button
+                type="button"
+                className={`nav-link w-100 text-start border-0 bg-transparent ${activeTab === 'staff' ? 'active' : ''}`}
+                onClick={() => handleNavClick('staff')}
+              >
+                <Users2 className="nav-icon" size={18} />
+                <span className="nav-text">Staff &amp; Branches</span>
               </button>
             </li>
 
@@ -191,10 +271,10 @@ export default function Sidebar() {
               SV
             </div>
             <div className="admin-info sidebar-footer-text">
-              <span className="admin-name">SSV Billing Admin</span>
+              <span className="admin-name">Vallarasu (Admin)</span>
               <span className="admin-role text-success d-flex align-items-center gap-1">
                 <span className="d-inline-block rounded-circle bg-success" style={{ width: '6px', height: '6px' }}></span>
-                Vyapar Edition • Online
+                Rayakottai SP Complex
               </span>
             </div>
           </div>

@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { useAuth } from '../context/AuthContext';
-import { Menu, Clock, Bell, Plus, Search, Cloud } from 'lucide-react';
+import {
+  Menu,
+  Clock,
+  Bell,
+  Plus,
+  Search,
+  Cloud,
+  User,
+  Shield,
+  KeyRound,
+  LogOut,
+  CheckCircle2,
+  AlertTriangle,
+  X
+} from 'lucide-react';
 
 export default function Navbar() {
   const {
@@ -10,12 +24,18 @@ export default function Navbar() {
     setMobileSidebarOpen,
     invoices,
     settings,
-    setEditingInvoice
+    setEditingInvoice,
+    notifications,
+    markNotificationRead,
+    clearNotifications,
+    setAuthModal
   } = useShop();
 
-  const { user, setLoginModalOpen, isConfigured } = useAuth();
+  const { user, logout, isConfigured } = useAuth();
 
   const [currentTime, setCurrentTime] = useState('');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -36,17 +56,22 @@ export default function Navbar() {
   }, []);
 
   const titles = {
-    dashboard: { title: 'Dashboard', breadcrumb: 'Vyapar / Business Overview' },
-    billing: { title: 'Sale Invoice (Bill)', breadcrumb: 'Sales / New Cash Memo' },
-    invoices: { title: 'Sales / All Invoices', breadcrumb: 'Sales / Invoice Register' },
-    customers: { title: 'Parties (Customers)', breadcrumb: 'Parties / Customer Directory' },
-    orders: { title: 'Delivery Pipeline', breadcrumb: 'Production / Flag Orders' },
-    reports: { title: 'Reports & Daybook', breadcrumb: 'Accounting / Financial Statements' },
-    settings: { title: 'Settings & Cloud Sync', breadcrumb: 'Configuration / Firebase Sync' },
+    dashboard: { title: 'Executive Dashboard', breadcrumb: 'Overview / Behance SaaS Standard' },
+    billing: { title: 'Sale Invoice (Bill of Supply)', breadcrumb: 'Sales / Point of Sale' },
+    invoices: { title: 'Sales, Invoices & Estimates', breadcrumb: 'Sales / Document Register' },
+    customers: { title: 'Parties & Customer Accounts', breadcrumb: 'Parties / Ledger Directory' },
+    products: { title: 'Products, Services & Inventory', breadcrumb: 'Inventory / Stock Management' },
+    payments: { title: 'Payments & Accounts Receivable', breadcrumb: 'Finance / Payment Register' },
+    purchases: { title: 'Purchases & Supplier Vendors', breadcrumb: 'Inventory / Inward Purchases' },
+    expenses: { title: 'Shop Overhead & Expenses', breadcrumb: 'Finance / Expense Ledger' },
+    orders: { title: 'Production & Delivery Pipeline', breadcrumb: 'Operations / Kanban Board' },
+    reports: { title: 'Reports & Embedded Analytics', breadcrumb: 'Accounting / Profit & Loss Statement' },
+    staff: { title: 'Staff, Roles & Branches', breadcrumb: 'Administration / Security Logs' },
+    settings: { title: 'System & Business Settings', breadcrumb: 'Configuration / Customization' },
   };
 
-  const currentInfo = titles[activeTab] || { title: 'SSV Vallarasu', breadcrumb: 'Dashboard' };
-  const pendingCount = invoices.filter(i => i.paymentStatus !== 'Paid').length;
+  const currentInfo = titles[activeTab] || { title: 'SSV Vallarasu ERP', breadcrumb: 'System' };
+  const unreadNotifs = notifications.filter(n => !n.read).length;
 
   const handleCreateNewBill = () => {
     setEditingInvoice(null);
@@ -54,7 +79,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="topbar">
+    <header className="topbar position-relative">
       <div className="topbar-left">
         <button
           type="button"
@@ -72,12 +97,12 @@ export default function Navbar() {
       </div>
 
       <div className="topbar-right">
-        {/* Vyapar Active Store Indicator */}
+        {/* Active Store Indicator */}
         <div className="d-none d-xl-flex align-items-center gap-2 px-3 py-1 bg-light border rounded-pill">
           <span className="d-inline-block rounded-circle bg-success shadow-sm" style={{ width: '7px', height: '7px' }}></span>
           <span className="small fw-bold text-dark">{settings.shopName || 'SSV VALLARASU'}</span>
           <span className="badge bg-danger text-white py-0 px-2 fw-bold" style={{ fontSize: '0.62rem' }}>
-            FLAGS &amp; PRINTING
+            RAYAKOTTAI
           </span>
         </div>
 
@@ -87,95 +112,139 @@ export default function Navbar() {
           <span>{currentTime || 'Clock'}</span>
         </div>
 
-        {/* Pending Invoices Notification Bell */}
-        <button
-          type="button"
-          className="topbar-btn position-relative"
-          onClick={() => setActiveTab('invoices')}
-          title="View Pending Dues / Invoices"
-        >
-          <Bell size={18} />
-          {pendingCount > 0 && (
-            <span className="topbar-badge">{pendingCount}</span>
-          )}
-        </button>
-
-        {/* Firebase Cloud Sync Status */}
-        <button
-          type="button"
-          className="topbar-btn"
-          onClick={() => setActiveTab('settings')}
-          title={isConfigured ? 'Firebase Cloud Storage Connected' : 'Configure Firebase'}
-        >
-          <Cloud size={18} className={isConfigured ? 'text-success' : 'text-muted'} />
-        </button>
-
-        {/* Google User Profile or Sign-In Button */}
-        {user ? (
-          <div
-            className="d-flex align-items-center gap-2 px-2 py-1 bg-white border rounded-pill shadow-sm cursor-pointer"
-            onClick={() => setLoginModalOpen(true)}
-            title={`Signed in as ${user.displayName || user.email} - Click to manage`}
-          >
-            {user.photoURL ? (
-              <img
-                src={user.photoURL}
-                alt={user.displayName}
-                className="rounded-circle"
-                style={{ width: '26px', height: '26px', objectFit: 'cover' }}
-              />
-            ) : (
-              <div
-                className="rounded-circle bg-danger text-white small fw-bold d-flex align-items-center justify-content-center"
-                style={{ width: '26px', height: '26px', fontSize: '0.75rem' }}
-              >
-                {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'G'}
-              </div>
-            )}
-            <span
-              className="small fw-bold text-dark d-none d-md-inline pe-1"
-              style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {user.displayName ? user.displayName.split(' ')[0] : 'Admin'}
-            </span>
-          </div>
-        ) : (
+        {/* Notifications Popover Trigger */}
+        <div className="position-relative">
           <button
             type="button"
-            className="btn btn-sm btn-outline-secondary fw-semibold d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm bg-white"
-            onClick={() => setLoginModalOpen(true)}
-            title="Sign in with Google"
+            className="topbar-btn position-relative"
+            onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }}
+            title="Notifications"
           >
-            <svg width="15" height="15" viewBox="0 0 48 48">
-              <path
-                fill="#EA4335"
-                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-              />
-              <path
-                fill="#4285F4"
-                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-              />
-              <path
-                fill="#34A853"
-                d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-              />
-            </svg>
-            <span className="d-none d-sm-inline">Google Sign In</span>
+            <Bell size={18} />
+            {unreadNotifs > 0 && (
+              <span className="topbar-badge">{unreadNotifs}</span>
+            )}
           </button>
-        )}
 
-        {/* Vyapar Signature "+ Add Sale" Button */}
+          {/* Notifications Dropdown Drawer */}
+          {notifOpen && (
+            <div
+              className="position-absolute end-0 mt-2 bg-white border rounded-3 shadow-lg p-3 z-3"
+              style={{ width: '320px', zIndex: 1050 }}
+            >
+              <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                <span className="fw-bold small text-dark">Notifications &amp; Alerts</span>
+                {notifications.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-link btn-xs p-0 text-muted text-decoration-none"
+                    onClick={clearNotifications}
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                {notifications.length > 0 ? (
+                  notifications.map(n => (
+                    <div
+                      key={n.id}
+                      className={`p-2 rounded border small ${n.read ? 'bg-light text-muted' : 'bg-danger-subtle border-danger-subtle'}`}
+                      onClick={() => markNotificationRead(n.id)}
+                    >
+                      <div className="fw-bold text-dark">{n.title}</div>
+                      <div style={{ fontSize: '0.74rem' }}>{n.message}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-3 text-muted small">No notifications right now.</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* User Account / Profile Menu */}
+        <div className="position-relative">
+          <button
+            type="button"
+            className="btn btn-sm btn-light border rounded-pill d-flex align-items-center gap-2 px-2 py-1 shadow-sm"
+            onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
+          >
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt="Avatar" className="rounded-circle" style={{ width: '26px', height: '26px', objectFit: 'cover' }} />
+            ) : (
+              <div className="rounded-circle bg-danger text-white d-flex align-items-center justify-content-center fw-bold" style={{ width: '26px', height: '26px', fontSize: '0.72rem' }}>
+                SV
+              </div>
+            )}
+            <span className="small fw-bold text-dark d-none d-sm-inline">
+              {user?.displayName || 'Vallarasu'}
+            </span>
+          </button>
+
+          {/* User Menu Dropdown */}
+          {userMenuOpen && (
+            <div
+              className="position-absolute end-0 mt-2 bg-white border rounded-3 shadow-lg p-2 z-3"
+              style={{ width: '220px', zIndex: 1050 }}
+            >
+              <div className="px-2 py-1 border-bottom mb-1">
+                <div className="fw-bold small text-dark">{user?.displayName || 'Vallarasu'}</div>
+                <div className="text-muted" style={{ fontSize: '0.7rem' }}>{user?.email || 'digitalssv126@gmail.com'}</div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-sm btn-light w-100 text-start d-flex align-items-center gap-2 mb-1"
+                onClick={() => { setUserMenuOpen(false); setAuthModal('profile'); }}
+              >
+                <User size={14} /> <span>User Profile</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-sm btn-light w-100 text-start d-flex align-items-center gap-2 mb-1"
+                onClick={() => { setUserMenuOpen(false); setAuthModal('change_password'); }}
+              >
+                <KeyRound size={14} /> <span>Change Password</span>
+              </button>
+
+              <div className="border-top my-1"></div>
+
+              {user ? (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger w-100 text-start d-flex align-items-center gap-2"
+                  onClick={async () => {
+                    setUserMenuOpen(false);
+                    await logout();
+                  }}
+                >
+                  <LogOut size={14} /> <span>Sign Out</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary w-100 text-start d-flex align-items-center gap-2"
+                  onClick={() => { setUserMenuOpen(false); setAuthModal('login'); }}
+                >
+                  <Shield size={14} /> <span>Sign In</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Create Bill Button */}
         <button
           type="button"
-          className="btn btn-vyapar-sale d-flex align-items-center gap-1 px-3 py-1 shadow-sm"
+          className="btn btn-vyapar-sale btn-sm d-flex align-items-center gap-1 shadow-sm px-3 fw-bold"
           onClick={handleCreateNewBill}
         >
           <Plus size={16} />
-          <span>Add Sale</span>
+          <span className="d-none d-sm-inline">New Bill</span>
         </button>
       </div>
     </header>

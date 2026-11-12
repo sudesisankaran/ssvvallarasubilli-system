@@ -18,7 +18,10 @@ import {
   ShieldCheck,
   LogOut,
   ExternalLink,
-  Layers
+  Layers,
+  Printer,
+  Sliders,
+  Bell
 } from 'lucide-react';
 
 export default function Settings() {
@@ -26,6 +29,7 @@ export default function Settings() {
     settings,
     setSettings,
     clearAllData,
+    clearAllDemoData,
     exportBackup,
     importBackup,
     addToast
@@ -37,13 +41,13 @@ export default function Settings() {
     config,
     updateConfig,
     resetConfig,
-    loginWithGoogle,
-    logout,
     uploadImage
   } = useAuth();
 
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'logo', 'tax', 'invoice', 'payment', 'printer', 'cloud', 'backup'
   const [form, setForm] = useState({ ...settings });
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingSign, setUploadingSign] = useState(false);
 
   // Firebase Config State
   const [fbConfig, setFbConfig] = useState({
@@ -63,7 +67,7 @@ export default function Settings() {
     setFbConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  // Handle Logo Upload with Firebase Storage & local fallback
+  // Handle Logo Upload
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -78,11 +82,7 @@ export default function Settings() {
       const res = await uploadImage(file, 'shop_logos');
       if (res && res.success) {
         setForm(prev => ({ ...prev, logoUrl: res.url }));
-        if (res.storage === 'firebase') {
-          addToast('Logo uploaded to Firebase Cloud Storage! Click "Save Shop Settings" to apply.', 'success');
-        } else {
-          addToast('Logo loaded locally! Click "Save Shop Settings" to apply.', 'info');
-        }
+        addToast('Logo uploaded! Click "Save Settings" to persist.', 'success');
       } else {
         addToast(res.error || 'Failed to upload logo image.', 'danger');
       }
@@ -94,15 +94,29 @@ export default function Settings() {
     }
   };
 
-  const handleRemoveLogo = () => {
-    setForm(prev => ({ ...prev, logoUrl: null }));
-    addToast('Logo removed.', 'info');
+  // Handle Signature Upload
+  const handleSignUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingSign(true);
+    try {
+      const res = await uploadImage(file, 'signatures');
+      if (res && res.success) {
+        setForm(prev => ({ ...prev, signatureUrl: res.url }));
+        addToast('Signature uploaded! Click "Save Settings" to persist.', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploadingSign(false);
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setSettings(form);
-    addToast('Shop settings and logo updated successfully!', 'success');
+    addToast('Shop configuration saved successfully!', 'success');
   };
 
   const handleSaveFirebaseConfig = (e) => {
@@ -112,593 +126,477 @@ export default function Settings() {
       return;
     }
     updateConfig(fbConfig);
-    addToast('Firebase credentials saved! Please reload page to apply changes.', 'success');
-  };
-
-  const handleResetFirebaseConfig = () => {
-    if (window.confirm('Reset Firebase configuration to environment defaults?')) {
-      resetConfig();
-      setFbConfig({
-        apiKey: '',
-        authDomain: '',
-        projectId: '',
-        storageBucket: '',
-        messagingSenderId: '',
-        appId: ''
-      });
-      addToast('Firebase configuration reset.', 'info');
-    }
-  };
-
-  const handleTestGoogleLogin = async () => {
-    try {
-      const res = await loginWithGoogle();
-      addToast(`Connected: ${res.displayName || res.email}`, 'success');
-    } catch (err) {
-      addToast(`Google login error: ${err.message}`, 'danger');
-    }
+    addToast('Firebase credentials saved!', 'success');
   };
 
   const handleRestoreFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
-      const res = importBackup(event.target.result);
-      if (res) {
-        setForm(settings);
-      }
+      importBackup(event.target.result);
     };
     reader.readAsText(file);
     e.target.value = '';
   };
 
-  const handleClearAll = () => {
-    if (window.confirm('Are you sure you want to clear all invoices and customers? This will completely empty the database for fresh real usage.')) {
-      clearAllData();
-    }
-  };
-
   return (
     <div className="space-y-4">
-      {/* 1. FIREBASE CLOUD & GOOGLE SERVICES PANEL */}
-      <div className="card-custom">
-        <div className="card-header-custom d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <div className="d-flex align-items-center gap-2">
-            <Cloud size={18} className="text-primary" />
-            <h2 className="fs-6 fw-bold mb-0">Firebase Cloud &amp; Google Services</h2>
+      {/* 1. TOP HEADER */}
+      <div className="bg-white border rounded-3 p-3 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div className="d-flex align-items-center gap-3">
+          <div className="p-2 bg-primary text-white rounded-3">
+            <Store size={24} />
           </div>
-          <div className="d-flex align-items-center gap-2">
-            {isConfigured ? (
-              <span className="badge bg-success-subtle text-success border border-success-subtle d-flex align-items-center gap-1 py-1 px-2">
-                <CheckCircle2 size={13} /> Firebase Storage &amp; Auth Ready
-              </span>
-            ) : (
-              <span className="badge bg-warning-subtle text-warning border border-warning-subtle d-flex align-items-center gap-1 py-1 px-2">
-                <AlertTriangle size={13} /> Credentials Needed
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="card-body-custom">
-          <div className="row g-4">
-            {/* Left: Google Sign-In Status */}
-            <div className="col-lg-5 border-end-lg">
-              <div className="p-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-between">
-                <div>
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <ShieldCheck size={20} className="text-primary" />
-                    <h3 className="fs-6 fw-bold text-dark mb-0">Google Authentication</h3>
-                  </div>
-                  <p className="small text-muted mb-3">
-                    Enables one-click Google Sign-In for shop operators and secure access to Firebase Storage.
-                  </p>
-
-                  {user ? (
-                    <div className="d-flex align-items-center gap-3 p-2 bg-white rounded-3 border shadow-sm mb-3">
-                      {user.photoURL ? (
-                        <img
-                          src={user.photoURL}
-                          alt={user.displayName}
-                          className="rounded-circle border"
-                          style={{ width: '42px', height: '42px', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div
-                          className="rounded-circle bg-primary text-white fw-bold d-flex align-items-center justify-content-center"
-                          style={{ width: '42px', height: '42px' }}
-                        >
-                          {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'G'}
-                        </div>
-                      )}
-                      <div className="flex-grow-1 overflow-hidden">
-                        <div className="fw-bold text-dark text-truncate">{user.displayName}</div>
-                        <div className="small text-muted text-truncate">{user.email}</div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger py-1 px-2"
-                        onClick={logout}
-                        title="Sign Out"
-                      >
-                        <LogOut size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="mb-3">
-                      <button
-                        type="button"
-                        className="btn btn-white border w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-bold hover-shadow"
-                        onClick={handleTestGoogleLogin}
-                        disabled={!isConfigured}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 48 48">
-                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                        </svg>
-                        Sign in with Google
-                      </button>
-                      {!isConfigured && (
-                        <div className="small text-danger mt-1">
-                          Configure Firebase project keys on the right to enable Google Sign-In.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="small text-muted pt-2 border-top">
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Storage Engine:</span>
-                    <strong className={isConfigured ? 'text-success' : 'text-secondary'}>
-                      {isConfigured ? 'Firebase Cloud Storage' : 'Local Storage Fallback'}
-                    </strong>
-                  </div>
-                  <div className="d-flex justify-content-between">
-                    <span>Google Provider:</span>
-                    <strong className={isConfigured ? 'text-primary' : 'text-muted'}>
-                      {isConfigured ? 'Active' : 'Unconfigured'}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Firebase Project Keys Form */}
-            <div className="col-lg-7">
-              <form onSubmit={handleSaveFirebaseConfig}>
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="small fw-bold text-dark">Firebase Web App Credentials</span>
-                  <a
-                    href="https://console.firebase.google.com/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="small text-primary text-decoration-none d-flex align-items-center gap-1"
-                  >
-                    Firebase Console <ExternalLink size={12} />
-                  </a>
-                </div>
-
-                <div className="row g-2">
-                  <div className="col-sm-6">
-                    <label className="form-label small text-muted mb-1">API Key (apiKey) *</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm font-monospace"
-                      placeholder="AIzaSy..."
-                      value={fbConfig.apiKey}
-                      onChange={(e) => handleFbConfigChange('apiKey', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-sm-6">
-                    <label className="form-label small text-muted mb-1">Project ID (projectId) *</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm font-monospace"
-                      placeholder="ssv-vallarasu-shop"
-                      value={fbConfig.projectId}
-                      onChange={(e) => handleFbConfigChange('projectId', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-sm-6">
-                    <label className="form-label small text-muted mb-1">Storage Bucket (storageBucket)</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm font-monospace"
-                      placeholder="ssv-vallarasu.appspot.com"
-                      value={fbConfig.storageBucket}
-                      onChange={(e) => handleFbConfigChange('storageBucket', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-sm-6">
-                    <label className="form-label small text-muted mb-1">Auth Domain (authDomain)</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm font-monospace"
-                      placeholder="ssv-vallarasu.firebaseapp.com"
-                      value={fbConfig.authDomain}
-                      onChange={(e) => handleFbConfigChange('authDomain', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-sm-6">
-                    <label className="form-label small text-muted mb-1">App ID (appId)</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm font-monospace"
-                      placeholder="1:1234567890:web:abcdef..."
-                      value={fbConfig.appId}
-                      onChange={(e) => handleFbConfigChange('appId', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-sm-6">
-                    <label className="form-label small text-muted mb-1">Messaging Sender ID</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm font-monospace"
-                      placeholder="1234567890"
-                      value={fbConfig.messagingSenderId}
-                      onChange={(e) => handleFbConfigChange('messagingSenderId', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center justify-content-between mt-3 pt-2 border-top">
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline-secondary"
-                    onClick={handleResetFirebaseConfig}
-                  >
-                    Clear Keys
-                  </button>
-
-                  <button type="submit" className="btn btn-sm btn-primary-custom px-3">
-                    <Cloud size={14} className="me-1 d-inline" /> Save Firebase Credentials
-                  </button>
-                </div>
-              </form>
+          <div>
+            <h1 className="fs-5 fw-bold text-dark mb-0">System &amp; Business Settings</h1>
+            <div className="text-muted small">
+              Configure company profile, Vyapar bill templates, printers, and cloud credentials
             </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="btn btn-vyapar-sale btn-sm px-4 fw-bold shadow-sm"
+          onClick={handleSubmit}
+        >
+          <Check size={16} className="me-1 d-inline" /> Save All Settings
+        </button>
       </div>
 
-      {/* 2. GENERAL SHOP PROFILE & SETTINGS */}
-      <form onSubmit={handleSubmit}>
-        <div className="row g-3">
-          {/* Shop Profile & Custom Logo */}
-          <div className="col-lg-6">
-            <div className="card-custom h-100">
-              <div className="card-header-custom">
-                <h2 className="fs-6 fw-bold mb-0">Business Profile &amp; Shop Logo</h2>
-              </div>
-              <div className="card-body-custom">
-                {/* Logo Upload Section with Firebase Storage */}
-                <div className="p-3 bg-light border rounded mb-3">
-                  <label className="form-label small fw-bold text-muted d-block mb-2 d-flex justify-content-between">
-                    <span>Shop Logo</span>
-                    {form.logoUrl && (
-                      <span className="badge bg-primary-subtle text-primary fw-normal">
-                        {form.logoUrl.startsWith('http') ? 'Firebase Cloud Storage' : 'Local Storage'}
-                      </span>
-                    )}
-                  </label>
+      {/* 2. SETTINGS NAVIGATION TABS */}
+      <div className="bg-white border rounded-3 p-2 shadow-sm d-flex flex-wrap gap-1">
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'profile' ? 'btn-primary' : 'btn-light text-dark'} fw-bold px-3`}
+          onClick={() => setActiveTab('profile')}
+        >
+          Business Profile
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'logo' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('logo')}
+        >
+          Logo &amp; Signature
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'tax' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('tax')}
+        >
+          GST &amp; Tax Settings
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'invoice' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('invoice')}
+        >
+          Invoice &amp; Terms
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'payment' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('payment')}
+        >
+          Bank &amp; UPI Details
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'printer' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('printer')}
+        >
+          Printer &amp; Format
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'cloud' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('cloud')}
+        >
+          Firebase Cloud
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'backup' ? 'btn-primary' : 'btn-light text-dark'} fw-semibold px-3`}
+          onClick={() => setActiveTab('backup')}
+        >
+          Backup &amp; Reset
+        </button>
+      </div>
 
-                  <div className="d-flex align-items-center gap-3">
-                    {form.logoUrl ? (
-                      <div className="position-relative">
-                        <img
-                          src={form.logoUrl}
-                          alt="Shop Logo"
-                          className="rounded border p-1 bg-white shadow-sm"
-                          style={{ width: '64px', height: '64px', objectFit: 'contain' }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-danger p-0 rounded-circle position-absolute top-0 end-0 translate-middle shadow"
-                          style={{ width: '20px', height: '20px', fontSize: '10px' }}
-                          onClick={handleRemoveLogo}
-                          title="Remove Logo"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        className="rounded border d-flex flex-column align-items-center justify-content-center bg-white text-muted"
-                        style={{ width: '64px', height: '64px' }}
-                      >
-                        <ImageIcon size={22} />
-                        <span style={{ fontSize: '9px' }}>No Logo</span>
-                      </div>
-                    )}
+      {/* 3. TAB VIEWS */}
+      {/* TAB 1: BUSINESS PROFILE */}
+      {activeTab === 'profile' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">Shop &amp; Company Information</h2>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">Business / Shop Name *</label>
+              <input
+                type="text"
+                className="form-control form-control-sm fw-bold"
+                value={form.shopName}
+                onChange={(e) => handleChange('shopName', e.target.value)}
+                required
+              />
+            </div>
 
-                    <div className="flex-grow-1">
-                      <label className="btn btn-sm btn-outline-primary mb-1 cursor-pointer fw-semibold">
-                        <Upload size={14} className="me-1 d-inline" />
-                        {uploadingLogo ? 'Uploading to Storage...' : (form.logoUrl ? 'Change Logo Image' : 'Upload Logo to Firebase')}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          onChange={handleLogoUpload}
-                          disabled={uploadingLogo}
-                        />
-                      </label>
-                      <div className="text-muted small" style={{ fontSize: '0.74rem' }}>
-                        PNG, JPG, SVG or WEBP up to 5MB. Automatically synchronized to invoices and header.
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">Subtitle / Tagline</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.shopSubtitle}
+                onChange={(e) => handleChange('shopSubtitle', e.target.value)}
+              />
+            </div>
 
-                {/* Shop Name & Subtitle */}
-                <div className="row g-2 mb-3">
-                  <div className="col-12">
-                    <label className="form-label small fw-bold text-muted">Business / Shop Name *</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm fw-bold"
-                      value={form.shopName}
-                      onChange={(e) => handleChange('shopName', e.target.value)}
-                      required
-                    />
-                  </div>
+            <div className="col-12">
+              <label className="form-label small fw-bold text-muted mb-1">Full Shop Address (Appears on Invoices)</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.address}
+                onChange={(e) => handleChange('address', e.target.value)}
+              />
+            </div>
 
-                  <div className="col-12">
-                    <label className="form-label small fw-bold text-muted">Subtitle / Tagline</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.subtitle}
-                      onChange={(e) => handleChange('subtitle', e.target.value)}
-                    />
-                  </div>
-                </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold text-muted mb-1">Contact Phone</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.phone}
+                onChange={(e) => handleChange('phone', e.target.value)}
+              />
+            </div>
 
-                {/* Contact Information */}
-                <div className="row g-2 mb-3">
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold text-muted">Primary Phone Number *</label>
-                    <input
-                      type="tel"
-                      className="form-control form-control-sm"
-                      value={form.phone}
-                      onChange={(e) => handleChange('phone', e.target.value)}
-                      required
-                    />
-                  </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold text-muted mb-1">WhatsApp Number</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.whatsapp}
+                onChange={(e) => handleChange('whatsapp', e.target.value)}
+              />
+            </div>
 
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold text-muted">WhatsApp Number</label>
-                    <input
-                      type="tel"
-                      className="form-control form-control-sm"
-                      value={form.whatsapp}
-                      onChange={(e) => handleChange('whatsapp', e.target.value)}
-                    />
-                  </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold text-muted mb-1">Official Email Address</label>
+              <input
+                type="email"
+                className="form-control form-control-sm"
+                value={form.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <div className="col-12">
-                    <label className="form-label small fw-bold text-muted">Email Address</label>
-                    <input
-                      type="email"
-                      className="form-control form-control-sm"
-                      value={form.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Shop Address */}
-                <div className="mb-3">
-                  <label className="form-label small fw-bold text-muted">Shop Physical Address *</label>
-                  <textarea
-                    className="form-control form-control-sm"
-                    rows={2}
-                    value={form.address}
-                    onChange={(e) => handleChange('address', e.target.value)}
-                    required
+      {/* TAB 2: LOGO & SIGNATURE */}
+      {activeTab === 'logo' && (
+        <div className="card-custom p-4">
+          <div className="row g-4">
+            <div className="col-md-6">
+              <h2 className="fs-6 fw-bold mb-2">Shop Round Logo</h2>
+              <p className="small text-muted mb-3">Printed on the top banner of Vyapar Bills of Supply.</p>
+              <div className="d-flex align-items-center gap-3 mb-3">
+                <div
+                  className="rounded-circle border p-1 bg-white shadow-sm d-flex align-items-center justify-content-center"
+                  style={{ width: '80px', height: '80px', overflow: 'hidden' }}
+                >
+                  <img
+                    src={form.logoUrl || '/assets/ssv_logo.png'}
+                    alt="Logo"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
+                <div>
+                  <label className="btn btn-outline-primary btn-sm mb-1 cursor-pointer">
+                    <Upload size={14} className="me-1 d-inline" /> Upload New Logo
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+                  </label>
+                  <div className="small text-muted">Recommended: PNG / JPG up to 5MB</div>
+                </div>
+              </div>
+            </div>
 
-                {/* City, State & Pincode */}
-                <div className="row g-2">
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-muted">City</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.city}
-                      onChange={(e) => handleChange('city', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-muted">State</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.state}
-                      onChange={(e) => handleChange('state', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-muted">Pincode</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.pincode}
-                      onChange={(e) => handleChange('pincode', e.target.value)}
-                    />
-                  </div>
+            <div className="col-md-6">
+              <h2 className="fs-6 fw-bold mb-2">Authorized Cursive Signature</h2>
+              <p className="small text-muted mb-3">Appears above Authorized Signatory on printed bills.</p>
+              <div className="d-flex align-items-center gap-3 mb-3">
+                <div
+                  className="border p-2 bg-white rounded shadow-sm d-flex align-items-center justify-content-center"
+                  style={{ width: '160px', height: '65px' }}
+                >
+                  <img
+                    src={form.signatureUrl || '/assets/signature.png'}
+                    alt="Signature"
+                    style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+                <div>
+                  <label className="btn btn-outline-secondary btn-sm mb-1 cursor-pointer">
+                    <Upload size={14} className="me-1 d-inline" /> Upload Signature
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleSignUpload} />
+                  </label>
+                  <div className="small text-muted">Transparent PNG format recommended</div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Invoice Defaults & Bank Details */}
-          <div className="col-lg-6">
-            {/* Invoice Configuration */}
-            <div className="card-custom mb-3">
-              <div className="card-header-custom">
-                <h2 className="fs-6 fw-bold mb-0">Invoice Configuration &amp; Prefixes</h2>
-              </div>
-              <div className="card-body-custom">
-                <div className="row g-2">
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-muted">Invoice Prefix</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm text-uppercase"
-                      value={form.invoicePrefix}
-                      onChange={(e) => handleChange('invoicePrefix', e.target.value.toUpperCase())}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-muted">Next Number</label>
-                    <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      value={form.nextInvoiceNum}
-                      onChange={(e) => handleChange('nextInvoiceNum', parseInt(e.target.value, 10) || 1000)}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small fw-bold text-muted">Currency Symbol</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.currency}
-                      onChange={(e) => handleChange('currency', e.target.value)}
-                    />
-                  </div>
+      {/* TAB 3: GST & TAX SETTINGS */}
+      {activeTab === 'tax' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">GST &amp; Tax Configuration</h2>
+          <div className="row g-3">
+            <div className="col-md-4">
+              <label className="form-label small fw-bold text-muted mb-1">GSTIN Number</label>
+              <input
+                type="text"
+                className="form-control form-control-sm font-monospace"
+                placeholder="33AAACV9842F1Z4 (or leave blank if non-GST)"
+                value={form.gstin}
+                onChange={(e) => handleChange('gstin', e.target.value)}
+              />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold text-muted mb-1">State Name</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.state}
+                onChange={(e) => handleChange('state', e.target.value)}
+              />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold text-muted mb-1">State Code</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.stateCode}
+                onChange={(e) => handleChange('stateCode', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: INVOICE & TERMS */}
+      {activeTab === 'invoice' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">Invoice Numbering &amp; Terms</h2>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">Invoice Prefix</label>
+              <input
+                type="text"
+                className="form-control form-control-sm font-monospace"
+                placeholder="e.g. SSV-2026- or empty"
+                value={form.invoicePrefix}
+                onChange={(e) => handleChange('invoicePrefix', e.target.value)}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">Next Bill Number</label>
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                value={form.nextInvoiceNum}
+                onChange={(e) => handleChange('nextInvoiceNum', e.target.value)}
+              />
+            </div>
+            <div className="col-12">
+              <label className="form-label small fw-bold text-muted mb-1">Terms &amp; Conditions</label>
+              <textarea
+                className="form-control form-control-sm"
+                rows={4}
+                value={form.terms}
+                onChange={(e) => handleChange('terms', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: BANK & UPI DETAILS */}
+      {activeTab === 'payment' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">Bank Account &amp; UPI ID for Invoices</h2>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">Bank Name</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.bankName}
+                onChange={(e) => handleChange('bankName', e.target.value)}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">Account Number</label>
+              <input
+                type="text"
+                className="form-control form-control-sm font-monospace"
+                value={form.accountNumber}
+                onChange={(e) => handleChange('accountNumber', e.target.value)}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">IFSC Code</label>
+              <input
+                type="text"
+                className="form-control form-control-sm font-monospace"
+                value={form.ifscCode}
+                onChange={(e) => handleChange('ifscCode', e.target.value)}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold text-muted mb-1">UPI ID (e.g. Google Pay)</label>
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                value={form.upiId}
+                onChange={(e) => handleChange('upiId', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: PRINTER & FORMAT */}
+      {activeTab === 'printer' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">Printer &amp; Paper Output Format</h2>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <div className="p-3 border rounded-3 bg-light">
+                <div className="form-check">
+                  <input className="form-check-input" type="radio" name="printerFormat" id="fmtA4" defaultChecked />
+                  <label className="form-check-label fw-bold text-dark" htmlFor="fmtA4">
+                    A4 Portrait (Vyapar Bill of Supply with Acknowledgement Slip)
+                  </label>
+                </div>
+                <div className="small text-muted mt-1 ps-4">
+                  Standard laser/inkjet printer layout with vibrant orange header, signature, and perforated tear-off slip.
                 </div>
               </div>
             </div>
 
-            {/* Bank Details */}
-            <div className="card-custom mb-3">
-              <div className="card-header-custom">
-                <h2 className="fs-6 fw-bold mb-0">Bank &amp; Payment Details (Printed on Invoices)</h2>
-              </div>
-              <div className="card-body-custom">
-                <div className="row g-2">
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold text-muted">Bank Name</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.bankName}
-                      onChange={(e) => handleChange('bankName', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold text-muted">Account Number</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.accountNumber}
-                      onChange={(e) => handleChange('accountNumber', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold text-muted">IFSC Code</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm text-uppercase"
-                      value={form.ifscCode}
-                      onChange={(e) => handleChange('ifscCode', e.target.value.toUpperCase())}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold text-muted">Branch Name</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      value={form.branch}
-                      onChange={(e) => handleChange('branch', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label small fw-bold text-muted">UPI ID for Invoices</label>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      placeholder="e.g. 9842155678@sbi"
-                      value={form.upiId}
-                      onChange={(e) => handleChange('upiId', e.target.value)}
-                    />
-                  </div>
+            <div className="col-md-6">
+              <div className="p-3 border rounded-3 bg-light">
+                <div className="form-check">
+                  <input className="form-check-input" type="radio" name="printerFormat" id="fmtThermal" />
+                  <label className="form-check-label fw-bold text-dark" htmlFor="fmtThermal">
+                    Thermal POS Receipt (80mm / 3-inch roll)
+                  </label>
+                </div>
+                <div className="small text-muted mt-1 ps-4">
+                  Compact thermal receipt format for quick counter flag pickup slips and cash drawers.
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Terms and Conditions */}
-            <div className="card-custom">
-              <div className="card-header-custom">
-                <h2 className="fs-6 fw-bold mb-0">Invoice Terms &amp; Conditions</h2>
+      {/* TAB 7: FIREBASE CLOUD */}
+      {activeTab === 'cloud' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">Firebase Cloud Credentials</h2>
+          <form onSubmit={handleSaveFirebaseConfig}>
+            <div className="row g-2 mb-3">
+              <div className="col-md-6">
+                <label className="form-label small fw-bold text-muted mb-1">API Key</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm font-monospace"
+                  value={fbConfig.apiKey}
+                  onChange={(e) => handleFbConfigChange('apiKey', e.target.value)}
+                />
               </div>
-              <div className="card-body-custom">
-                <textarea
-                  className="form-control form-control-sm"
-                  rows={3}
-                  value={form.terms}
-                  onChange={(e) => handleChange('terms', e.target.value)}
+              <div className="col-md-6">
+                <label className="form-label small fw-bold text-muted mb-1">Project ID</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm font-monospace"
+                  value={fbConfig.projectId}
+                  onChange={(e) => handleFbConfigChange('projectId', e.target.value)}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-bold text-muted mb-1">Auth Domain</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm font-monospace"
+                  value={fbConfig.authDomain}
+                  onChange={(e) => handleFbConfigChange('authDomain', e.target.value)}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-bold text-muted mb-1">Storage Bucket</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm font-monospace"
+                  value={fbConfig.storageBucket}
+                  onChange={(e) => handleFbConfigChange('storageBucket', e.target.value)}
                 />
               </div>
             </div>
+            <button type="submit" className="btn btn-primary-custom btn-sm px-4 fw-bold">
+              Save Firebase Configuration
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 8: BACKUP & PURGE */}
+      {activeTab === 'backup' && (
+        <div className="card-custom p-4">
+          <h2 className="fs-6 fw-bold mb-3 text-dark">Data Backup &amp; Reset Management</h2>
+          <div className="d-flex flex-wrap gap-2 mb-4">
+            <button type="button" className="btn btn-outline-primary btn-sm" onClick={exportBackup}>
+              <Download size={14} className="me-1 d-inline" /> Export Full System JSON Backup
+            </button>
+            <label className="btn btn-outline-secondary btn-sm mb-0 cursor-pointer">
+              <Upload size={14} className="me-1 d-inline" /> Restore JSON Backup
+              <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleRestoreFile} />
+            </label>
           </div>
 
-          {/* Action Bar: Save & Data Management */}
-          <div className="col-12">
-            <div className="card-custom">
-              <div className="card-body-custom d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <div className="d-flex align-items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={exportBackup}
-                  >
-                    <Download size={14} className="me-1 d-inline" /> Export JSON Backup
-                  </button>
-
-                  <label className="btn btn-outline-secondary btn-sm mb-0 cursor-pointer">
-                    <Upload size={14} className="me-1 d-inline" /> Restore JSON Backup
-                    <input
-                      type="file"
-                      accept=".json"
-                      style={{ display: 'none' }}
-                      onChange={handleRestoreFile}
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline-danger btn-sm"
-                    onClick={handleClearAll}
-                    title="Purge all invoices and customers for clean real usage"
-                  >
-                    <Trash2 size={14} className="me-1 d-inline" /> Clear All Data (Purge)
-                  </button>
-                </div>
-
-                <button type="submit" className="btn btn-primary-custom px-4">
-                  <Check size={16} /> Save Shop Settings
-                </button>
-              </div>
+          <div className="border-top pt-3">
+            <h3 className="fs-6 fw-bold text-danger mb-2">Danger Zone</h3>
+            <p className="small text-muted mb-3">
+              Clear test data or completely wipe the database for fresh production usage.
+            </p>
+            <div className="d-flex gap-2">
+              <button
+                type="button"
+                className="btn btn-outline-warning btn-sm"
+                onClick={() => {
+                  if (window.confirm('Remove all demo/sample records?')) clearAllDemoData();
+                }}
+              >
+                Clear Demo Data Only
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => {
+                  if (window.confirm('Wipe ALL sales, purchases, and customer records?')) clearAllData();
+                }}
+              >
+                <Trash2 size={14} className="me-1 d-inline" /> Wipe Entire Database
+              </button>
             </div>
           </div>
         </div>
-      </form>
+      )}
     </div>
   );
 }
