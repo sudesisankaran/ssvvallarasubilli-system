@@ -110,26 +110,19 @@ export default function Billing() {
     setDiscountValue(0);
     setAdvancePaid(0);
 
-    const defaultSrv = services[0] || {
-      category: 'Flag Printing',
-      name: 'TWO SIDE',
-      defaultRate: 1800,
-      unit: 'Pcs'
-    };
-
     setItems([{
       id: 'ITM_' + Date.now(),
-      category: defaultSrv.category || 'Flag Printing',
-      serviceName: 'TWO SIDE',
+      category: 'Flag Printing',
+      serviceName: '',
       description: '',
-      size: '4.5x1.5',
-      width: 4.5,
-      height: 1.5,
+      size: '',
+      width: 0,
+      height: 0,
       quantity: 1,
       unit: 'Pcs',
-      rate: 1800,
-      discount: 600,
-      amount: 1200
+      rate: 0,
+      discount: 0,
+      amount: 0
     }]);
   };
 
@@ -148,26 +141,19 @@ export default function Billing() {
 
   // Add Item Row
   const handleAddItem = () => {
-    const defaultSrv = services[1] || services[0] || {
-      category: 'Flag Printing',
-      name: 'ONE SIDE',
-      defaultRate: 600,
-      unit: 'Pcs'
-    };
-
     const newItem = {
       id: 'ITM_' + Date.now() + Math.random().toString(36).substring(2, 5),
-      category: defaultSrv.category || 'Flag Printing',
-      serviceName: defaultSrv.name || 'ONE SIDE',
+      category: 'Flag Printing',
+      serviceName: '',
       description: '',
-      size: '3x1.3',
-      width: 3,
-      height: 1.3,
+      size: '',
+      width: 0,
+      height: 0,
       quantity: 1,
-      unit: defaultSrv.unit || 'Pcs',
-      rate: defaultSrv.defaultRate || 600,
+      unit: 'Pcs',
+      rate: 0,
       discount: 0,
-      amount: defaultSrv.defaultRate || 600
+      amount: 0
     };
     setItems(prev => [...prev, newItem]);
   };

@@ -330,9 +330,37 @@ export default function Invoices() {
               ) : (
                 <tr>
                   <td colSpan="9" className="text-center py-5 text-muted">
-                    <Receipt size={32} className="mx-auto mb-2 opacity-50" />
-                    <div className="fw-semibold">No invoices match your filters.</div>
-                    <div className="small">Try resetting your search or filter tags.</div>
+                    <Receipt size={40} className="mx-auto mb-3 text-secondary opacity-50" />
+                    <div className="fs-6 fw-bold text-dark">No Sales Records Found</div>
+                    <div className="small text-muted mb-3">
+                      {search || statusFilter !== 'all' || dateFilter !== 'all'
+                        ? 'No bills match your current search/filter. Try clearing filters.'
+                        : 'You have not generated any bills yet. Click below to create your first bill.'}
+                    </div>
+                    {search || statusFilter !== 'all' || dateFilter !== 'all' ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm px-3 fw-semibold"
+                        onClick={() => {
+                          setSearch('');
+                          setStatusFilter('all');
+                          setDateFilter('all');
+                        }}
+                      >
+                        Reset All Filters
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-vyapar-sale btn-sm fw-bold px-4 py-2 shadow-sm"
+                        onClick={() => {
+                          setEditingInvoice(null);
+                          setActiveTab('billing');
+                        }}
+                      >
+                        <Plus size={15} className="me-1 d-inline" /> Create First Bill
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}

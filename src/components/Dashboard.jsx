@@ -383,8 +383,20 @@ export default function Dashboard() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="7" className="text-center py-4 text-muted">
-                        No sales recorded yet. Click <strong>"+ Add Sale"</strong> to create your first bill!
+                      <td colSpan="7" className="text-center py-5 text-muted">
+                        <Receipt size={36} className="mx-auto mb-2 text-secondary opacity-50" />
+                        <div className="fw-bold text-dark fs-6">No Sales Recorded Yet</div>
+                        <div className="small text-muted mb-3">Clean system ready. Click "+ Add Sale" to create your first bill!</div>
+                        <button
+                          type="button"
+                          className="btn btn-vyapar-sale btn-sm fw-bold px-3 py-1 shadow-sm"
+                          onClick={() => {
+                            setEditingInvoice(null);
+                            setActiveTab('billing');
+                          }}
+                        >
+                          <Plus size={14} className="me-1 d-inline" /> + Add First Sale
+                        </button>
                       </td>
                     </tr>
                   )}

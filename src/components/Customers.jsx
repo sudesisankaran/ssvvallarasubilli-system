@@ -237,8 +237,13 @@ export default function Customers() {
                   );
                 })
               ) : (
-                <div className="p-4 text-center text-muted small">
-                  No parties found. Click <strong>"+ Add Party"</strong> to create one.
+                <div className="p-4 text-center text-muted">
+                  <Users size={32} className="mx-auto mb-2 text-secondary opacity-50" />
+                  <div className="fw-bold text-dark">No Customers Yet</div>
+                  <div className="small text-muted mb-3">Add regular clients or generate bills to automatically save parties.</div>
+                  <button type="button" className="btn btn-vyapar-sale btn-sm fw-bold shadow-sm" onClick={() => openFormModal(null)}>
+                    <UserPlus size={14} className="me-1 d-inline" /> + Add First Party
+                  </button>
                 </div>
               )}
             </div>
@@ -401,9 +406,12 @@ export default function Customers() {
             </div>
           ) : (
             <div className="card-custom p-5 text-center text-muted">
-              <Users size={36} className="mx-auto mb-2 opacity-50" />
-              <div className="fw-bold">No Party Selected</div>
-              <div className="small">Select a customer from the left list or add a new one.</div>
+              <Users size={48} className="mx-auto mb-3 text-secondary opacity-50" />
+              <h3 className="fs-5 fw-bold text-dark">No Party Selected</h3>
+              <p className="small text-muted mb-3">Select a customer from the left list or click below to create a new client account.</p>
+              <button type="button" className="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onClick={() => openFormModal(null)}>
+                <UserPlus size={14} className="me-1 d-inline" /> + Add New Party
+              </button>
             </div>
           )}
         </div>

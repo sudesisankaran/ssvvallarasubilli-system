@@ -9,7 +9,8 @@ import {
 
 const DEMO_CUSTOMER_NAMES = [
   'rajesh', 'dravida', 'senthil', 'sports club', 'arul murugan',
-  'meenakshi', 'temple trust', 'anitha', 'spark media', 'prakash', 'golden event'
+  'meenakshi', 'temple trust', 'anitha', 'spark media', 'prakash', 'golden event',
+  'demo', 'sample', 'test', 'spm', 'klm'
 ];
 
 function isDemoCustomer(cust) {
@@ -308,6 +309,14 @@ export function ShopProvider({ children }) {
   };
 
   // --- Data Management & Clear UI ---
+  const clearAllDemoData = () => {
+    setInvoices([]);
+    setCustomers([]);
+    localStorage.removeItem(STORAGE_KEYS.INVOICES);
+    localStorage.removeItem(STORAGE_KEYS.CUSTOMERS);
+    addToast('All demo/sample users and sales cleared for 100% clean production.', 'success');
+  };
+
   const clearAllData = () => {
     setInvoices([]);
     setCustomers([]);
@@ -390,6 +399,7 @@ export function ShopProvider({ children }) {
       updateService,
       deleteService,
       resetServicesToDefaults,
+      clearAllDemoData,
       clearAllData,
       exportBackup,
       importBackup
