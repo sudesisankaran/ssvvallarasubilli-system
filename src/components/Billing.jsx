@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
-import { formatCurrency } from '../utils/constants';
+import { formatCurrency, numberToWordsINR } from '../utils/constants';
 import {
   Save,
   Printer,
@@ -15,7 +15,8 @@ import {
   Calendar,
   Clock,
   FileText,
-  CreditCard
+  CreditCard,
+  AlertCircle
 } from 'lucide-react';
 
 export default function Billing() {
@@ -40,9 +41,14 @@ export default function Billing() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paymentMode, setPaymentMode] = useState('UPI (Google Pay / PhonePe)');
   const [orderStatus, setOrderStatus] = useState('Order Received');
   const [notes, setNotes] = useState('');
+
+  // Discount & Advance Paid State
+  const [discountType, setDiscountType] = useState('flat'); // 'flat' or 'percent'
+  const [discountValue, setDiscountValue] = useState(0);
+  const [advancePaid, setAdvancePaid] = useState(0);
 
   // Items State
   const [items, setItems] = useState([]);
@@ -57,20 +63,25 @@ export default function Billing() {
       setCustomerName(editingInvoice.customerName || '');
       setCustomerPhone(editingInvoice.customerPhone || '');
       setCustomerAddress(editingInvoice.customerAddress || '');
-      setPaymentMode(editingInvoice.paymentMode || 'Cash');
+      setPaymentMode(editingInvoice.paymentMode || 'UPI (Google Pay / PhonePe)');
       setOrderStatus(editingInvoice.orderStatus || 'Order Received');
       setNotes(editingInvoice.notes || '');
+      setDiscountType(editingInvoice.discountType === 'percent' ? 'percent' : 'flat');
+      setDiscountValue(parseFloat(editingInvoice.discountValue) || 0);
+      setAdvancePaid(parseFloat(editingInvoice.paidAmount) || 0);
 
       setItems((editingInvoice.items || []).map(itm => ({
         id: itm.id || ('ITM_' + Math.random().toString(36).substring(2, 6)),
         category: itm.category || 'Flag Printing',
-        serviceName: itm.serviceName || '',
+        serviceName: itm.serviceName || itm.name || '',
         description: itm.description || '',
+        size: itm.size || (itm.width && itm.height ? `${itm.width}x${itm.height}` : ''),
         width: parseFloat(itm.width) || 0,
         height: parseFloat(itm.height) || 0,
         quantity: parseFloat(itm.quantity) || 1,
         unit: itm.unit || 'Pcs',
         rate: parseFloat(itm.rate) || 0,
+        discount: parseFloat(itm.discount) || 0,
         amount: parseFloat(itm.amount) || 0
       })));
     } else {
@@ -92,28 +103,33 @@ export default function Billing() {
     setCustomerName('');
     setCustomerPhone('');
     setCustomerAddress('');
-    setPaymentMode('Cash');
+    setPaymentMode('UPI (Google Pay / PhonePe)');
     setOrderStatus('Order Received');
     setNotes('');
+    setDiscountType('flat');
+    setDiscountValue(0);
+    setAdvancePaid(0);
 
     const defaultSrv = services[0] || {
       category: 'Flag Printing',
-      name: 'National Flags (Indian Tiranga)',
-      defaultRate: 180,
+      name: 'TWO SIDE',
+      defaultRate: 1800,
       unit: 'Pcs'
     };
 
     setItems([{
       id: 'ITM_' + Date.now(),
       category: defaultSrv.category || 'Flag Printing',
-      serviceName: defaultSrv.name || 'National Flags (Indian Tiranga)',
-      description: 'Standard size with eyelets and ropes',
-      width: 0,
-      height: 0,
+      serviceName: 'TWO SIDE',
+      description: '',
+      size: '4.5x1.5',
+      width: 4.5,
+      height: 1.5,
       quantity: 1,
       unit: 'Pcs',
-      rate: defaultSrv.defaultRate || 180,
-      amount: defaultSrv.defaultRate || 180
+      rate: 1800,
+      discount: 600,
+      amount: 1200
     }]);
   };
 
@@ -132,24 +148,26 @@ export default function Billing() {
 
   // Add Item Row
   const handleAddItem = () => {
-    const defaultSrv = services[0] || {
+    const defaultSrv = services[1] || services[0] || {
       category: 'Flag Printing',
-      name: 'Custom Flag Order',
-      defaultRate: 150,
+      name: 'ONE SIDE',
+      defaultRate: 600,
       unit: 'Pcs'
     };
 
     const newItem = {
       id: 'ITM_' + Date.now() + Math.random().toString(36).substring(2, 5),
-      category: defaultSrv.category,
-      serviceName: defaultSrv.name,
+      category: defaultSrv.category || 'Flag Printing',
+      serviceName: defaultSrv.name || 'ONE SIDE',
       description: '',
-      width: 0,
-      height: 0,
+      size: '3x1.3',
+      width: 3,
+      height: 1.3,
       quantity: 1,
-      unit: 'Pcs',
-      rate: defaultSrv.defaultRate || 0,
-      amount: defaultSrv.defaultRate || 0
+      unit: defaultSrv.unit || 'Pcs',
+      rate: defaultSrv.defaultRate || 600,
+      discount: 0,
+      amount: defaultSrv.defaultRate || 600
     };
     setItems(prev => [...prev, newItem]);
   };
@@ -171,7 +189,7 @@ export default function Billing() {
     setItems(prev => prev.filter(i => i.id !== id));
   };
 
-  // Item Field Change with Live Square Feet & Amount Calculation
+  // Item Field Change with Live Calculations
   const handleItemChange = (id, field, value) => {
     setItems(prev => prev.map(item => {
       if (item.id !== id) return item;
@@ -184,40 +202,78 @@ export default function Billing() {
         if (found) {
           updated.category = found.category;
           updated.rate = found.defaultRate;
+          updated.unit = found.unit || updated.unit;
           if (found.description && !updated.description) {
             updated.description = found.description;
           }
         }
       }
 
-      // Live Area & Amount Computation:
+      // If user edits size directly e.g. "4.5x1.5" or "4x2"
+      if (field === 'size') {
+        const parts = String(value).split(/x|X|\*/);
+        if (parts.length === 2) {
+          const w = parseFloat(parts[0]) || 0;
+          const h = parseFloat(parts[1]) || 0;
+          if (w > 0 && h > 0) {
+            updated.width = w;
+            updated.height = h;
+          }
+        }
+      }
+
+      // If user edits width or height
+      if (field === 'width' || field === 'height') {
+        const w = parseFloat(field === 'width' ? value : updated.width) || 0;
+        const h = parseFloat(field === 'height' ? value : updated.height) || 0;
+        if (w > 0 && h > 0) {
+          updated.size = `${w}x${h}`;
+        }
+      }
+
+      // Live Amount Computation
       const qty = parseFloat(updated.quantity) || 0;
       const rate = parseFloat(updated.rate) || 0;
+      const disc = parseFloat(updated.discount) || 0;
       const w = parseFloat(updated.width) || 0;
       const h = parseFloat(updated.height) || 0;
 
-      if (w > 0 && h > 0) {
-        updated.unit = 'Sq.Ft';
-        updated.amount = (w * h * qty) * rate;
+      let gross = 0;
+      if (updated.unit === 'Sq.Ft' && w > 0 && h > 0) {
+        gross = (w * h * qty) * rate;
       } else {
-        updated.unit = 'Pcs';
-        updated.amount = qty * rate;
+        gross = qty * rate;
       }
+
+      updated.amount = Math.max(0, gross - disc);
 
       return updated;
     }));
   };
 
-  // Real-time Grand Total (Zero GST)
-  const grandTotal = Math.round(items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0));
-  const isCredit = paymentMode === 'Credit';
+  // Computations
+  const subtotal = Math.round(items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0));
   
-  // Paid and Balance computation
-  let paid = isCredit ? 0 : grandTotal;
-  if (editingInvoice && editingInvoice.paidAmount !== undefined) {
-    paid = editingInvoice.paidAmount;
+  // Overall bill discount
+  let overallDiscount = 0;
+  if (discountType === 'percent') {
+    overallDiscount = Math.round((subtotal * (parseFloat(discountValue) || 0)) / 100);
+  } else {
+    overallDiscount = parseFloat(discountValue) || 0;
   }
+
+  const grandTotal = Math.max(0, subtotal - overallDiscount);
+  const paid = parseFloat(advancePaid) || 0;
   const balanceDue = Math.max(0, grandTotal - paid);
+
+  // Quick Preset Buttons for Advance Paid
+  const handleQuickPaid = (type) => {
+    if (type === 'full') setAdvancePaid(grandTotal);
+    else if (type === 'half') setAdvancePaid(Math.round(grandTotal / 2));
+    else if (type === 'zero') setAdvancePaid(0);
+  };
+
+  // Payment Status
   let status = 'Paid';
   if (balanceDue > 0 && paid > 0) status = 'Partial';
   else if (balanceDue > 0 && paid === 0) status = 'Unpaid';
@@ -259,10 +315,10 @@ export default function Billing() {
       isInterstate: false,
       orderStatus: orderStatus || 'Order Received',
       items,
-      subtotal: grandTotal,
-      discountType: 'amount',
-      discountValue: 0,
-      discountAmount: 0,
+      subtotal,
+      discountType,
+      discountValue: parseFloat(discountValue) || 0,
+      discountAmount: overallDiscount,
       taxableAmount: grandTotal,
       gstEnabled: false,
       gstRate: 0,
@@ -287,7 +343,7 @@ export default function Billing() {
           amount: paid,
           mode: paymentMode,
           reference: 'Payment at bill creation',
-          note: 'Full settlement'
+          note: status === 'Paid' ? 'Full settlement' : 'Advance received'
         }
       ];
     }
@@ -328,7 +384,7 @@ export default function Billing() {
               {editingInvoice ? `Editing Bill: ${editingInvoice.invoiceNumber}` : 'Create New Bill'}
             </h1>
             <div className="text-muted small">
-              Fast, user-friendly flag printing billing (Instant calculation, no GST)
+              Fast, user-friendly flag printing billing (Vyapar style Bill of Supply)
             </div>
           </div>
         </div>
@@ -349,14 +405,14 @@ export default function Billing() {
             className="btn btn-outline-secondary btn-sm px-3 fw-semibold"
             onClick={resetForm}
           >
-            <RotateCcw size={14} className="me-1 d-inline" /> Clear Form
+            <RotateCcw size={14} className="me-1 d-inline" /> Clear
           </button>
           <button
             type="button"
-            className="btn btn-vyapar-sale btn-sm px-4 fw-semibold shadow-sm"
+            className="btn btn-primary-custom btn-sm px-4 fw-semibold shadow-sm"
             onClick={() => handleSaveInvoice(false)}
           >
-            <Save size={15} className="me-1 d-inline" /> {editingInvoice ? 'Update Bill' : 'Save Bill'}
+            <Save size={15} className="me-1 d-inline" /> {editingInvoice ? 'Update' : 'Save'}
           </button>
           <button
             type="button"
@@ -372,7 +428,7 @@ export default function Billing() {
       <div className="bg-white border rounded-3 p-3 shadow-sm">
         <div className="row g-2 align-items-center">
           {/* Customer Selection / Autocomplete */}
-          <div className="col-lg-3 col-md-6">
+          <div className="col-lg-4 col-md-6">
             <label className="form-label small fw-bold text-muted mb-1 d-flex justify-content-between">
               <span>Customer / Client Name *</span>
               {customers.length > 0 && (
@@ -386,7 +442,7 @@ export default function Billing() {
               <input
                 type="text"
                 className="form-control fw-semibold"
-                placeholder="Type client name..."
+                placeholder="Type client name (e.g. spm)..."
                 list="clientAutocompleteList"
                 value={customerName}
                 onChange={(e) => {
@@ -409,38 +465,17 @@ export default function Billing() {
           {/* Mobile Number */}
           <div className="col-lg-3 col-md-6">
             <label className="form-label small fw-bold text-muted mb-1">
-              Mobile Number
+              Contact / Mobile Number
             </label>
             <div className="input-group input-group-sm">
               <span className="input-group-text bg-light"><Phone size={14} /></span>
               <input
                 type="tel"
                 className="form-control"
-                placeholder="10-digit mobile"
+                placeholder="e.g. 6374102323"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
               />
-            </div>
-          </div>
-
-          {/* Payment Method */}
-          <div className="col-lg-2 col-md-4 col-6">
-            <label className="form-label small fw-bold text-muted mb-1">
-              Payment Mode
-            </label>
-            <div className="input-group input-group-sm">
-              <span className="input-group-text bg-light"><CreditCard size={14} /></span>
-              <select
-                className="form-select form-select-sm fw-semibold"
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-              >
-                <option value="Cash">Cash (Paid)</option>
-                <option value="UPI">UPI / GPay (Paid)</option>
-                <option value="Card">Card (Paid)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Credit">Credit (Pending)</option>
-              </select>
             </div>
           </div>
 
@@ -461,7 +496,7 @@ export default function Billing() {
           </div>
 
           {/* Delivery Due Date */}
-          <div className="col-lg-2 col-md-4 col-6">
+          <div className="col-lg-3 col-md-4 col-6">
             <label className="form-label small fw-bold text-muted mb-1">
               Delivery Date
             </label>
@@ -477,38 +512,23 @@ export default function Billing() {
           </div>
 
           {/* Address Line */}
-          <div className="col-md-7 mt-2">
+          <div className="col-12 mt-2">
             <div className="input-group input-group-sm">
               <span className="input-group-text bg-light"><MapPin size={13} /></span>
               <input
                 type="text"
                 className="form-control text-muted"
-                placeholder="Delivery address / customer city / event location (optional)..."
+                placeholder="Customer address / town / landmark (e.g. klm / Rayakottai)..."
                 value={customerAddress}
                 onChange={(e) => setCustomerAddress(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Job Notes Line */}
-          <div className="col-md-5 mt-2">
-            <div className="input-group input-group-sm">
-              <span className="input-group-text bg-light"><FileText size={13} /></span>
-              <input
-                type="text"
-                className="form-control text-muted"
-                placeholder="Job notes / special instructions (optional)..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. PRODUCT & SERVICE ITEMS SECTION (CLEAN & MINIMAL) */}
+      {/* 3. PRODUCT & SERVICE ITEMS SECTION */}
       <div className="bg-white border rounded-3 p-3 shadow-sm">
-        {/* Clean Header Bar (Quick Presets removed) */}
         <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
           <div className="fs-6 fw-bold text-dark">
             Bill Items &amp; Products
@@ -544,14 +564,14 @@ export default function Billing() {
                   </div>
 
                   {/* Product / Service Name */}
-                  <div className="col-md-5 col-12">
+                  <div className="col-md-3 col-12">
                     <label className="form-label small fw-bold text-muted mb-1">
-                      Product / Item Name *
+                      Item Name *
                     </label>
                     <input
                       type="text"
                       className="form-control form-control-sm fw-semibold bg-white"
-                      placeholder="e.g. Political Party Flag / Flex Banner"
+                      placeholder="e.g. TWO SIDE / ONE SIDE"
                       list={`srvList-${item.id}`}
                       value={item.serviceName}
                       onChange={(e) => handleItemChange(item.id, 'serviceName', e.target.value)}
@@ -565,42 +585,24 @@ export default function Billing() {
                     </datalist>
                   </div>
 
-                  {/* Dimensions: Width (ft) */}
-                  <div className="col-md-2 col-4">
+                  {/* Size (e.g. 4.5x1.5) */}
+                  <div className="col-md-2 col-6">
                     <label className="form-label small fw-bold text-muted mb-1 text-center d-block">
-                      Width (ft)
+                      Size (e.g. 4.5x1.5)
                     </label>
                     <input
-                      type="number"
-                      step="any"
-                      min="0"
+                      type="text"
                       className="form-control form-control-sm text-center bg-white"
-                      placeholder="W"
-                      value={item.width || ''}
-                      onChange={(e) => handleItemChange(item.id, 'width', e.target.value)}
-                    />
-                  </div>
-
-                  {/* Dimensions: Height (ft) */}
-                  <div className="col-md-2 col-4">
-                    <label className="form-label small fw-bold text-muted mb-1 text-center d-block">
-                      Height (ft)
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      className="form-control form-control-sm text-center bg-white"
-                      placeholder="H"
-                      value={item.height || ''}
-                      onChange={(e) => handleItemChange(item.id, 'height', e.target.value)}
+                      placeholder="e.g. 4.5x1.5"
+                      value={item.size || ''}
+                      onChange={(e) => handleItemChange(item.id, 'size', e.target.value)}
                     />
                   </div>
 
                   {/* Quantity */}
-                  <div className="col-md-1 col-4">
+                  <div className="col-md-1 col-3">
                     <label className="form-label small fw-bold text-muted mb-1 text-center d-block">
-                      Qty
+                      Quantity
                     </label>
                     <input
                       type="number"
@@ -612,10 +614,30 @@ export default function Billing() {
                     />
                   </div>
 
-                  {/* Rate (₹) */}
-                  <div className="col-md-2 col-12">
+                  {/* Unit Dropdown - Clean styling without chevron overlap (Fix for Image 2) */}
+                  <div className="col-md-1 col-3">
+                    <label className="form-label small fw-bold text-muted mb-1 text-center d-block">
+                      Unit
+                    </label>
+                    <select
+                      className="form-select form-select-sm text-center bg-white pe-4"
+                      style={{ minWidth: '78px' }}
+                      value={item.unit || 'Pcs'}
+                      onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
+                    >
+                      <option value="Pcs">Pcs</option>
+                      <option value="Sq.Ft">Sq.Ft</option>
+                      <option value="Box">Box</option>
+                      <option value="Set">Set</option>
+                      <option value="Roll">Roll</option>
+                      <option value="Sheet">Sheet</option>
+                    </select>
+                  </div>
+
+                  {/* Price / Unit (Rate) */}
+                  <div className="col-md-2 col-6">
                     <label className="form-label small fw-bold text-muted mb-1 text-end d-block">
-                      Rate (₹)
+                      Price/ Unit (₹)
                     </label>
                     <div className="input-group input-group-sm">
                       <span className="input-group-text bg-white">₹</span>
@@ -629,9 +651,35 @@ export default function Billing() {
                       />
                     </div>
                   </div>
+
+                  {/* Discount */}
+                  <div className="col-md-1 col-6">
+                    <label className="form-label small fw-bold text-muted mb-1 text-end d-block">
+                      Discount (₹)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="form-control form-control-sm text-end bg-white"
+                      placeholder="0"
+                      value={item.discount || ''}
+                      onChange={(e) => handleItemChange(item.id, 'discount', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Line Amount */}
+                  <div className="col-md-1 col-12 text-end">
+                    <label className="form-label small fw-bold text-muted mb-1 text-end d-block">
+                      Amount
+                    </label>
+                    <div className="fs-6 fw-bold text-primary">
+                      {formatCurrency(item.amount)}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Sub-line: Specs, Area Pill & Total Line Amount */}
+                {/* Sub-line: Specs & Actions */}
                 <div className="mt-2 pt-2 border-top d-flex flex-wrap align-items-center justify-content-between gap-2">
                   <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ maxWidth: '620px' }}>
                     <input
@@ -650,13 +698,6 @@ export default function Billing() {
                         {item.width}×{item.height} ft = <strong>{sqftPerPc} Sq.Ft</strong>/pc ({totalSqft} Sq.Ft total)
                       </span>
                     )}
-
-                    <div className="d-flex align-items-center gap-2">
-                      <span className="small text-muted fw-bold">Amount:</span>
-                      <span className="fs-6 fw-bold text-primary">
-                        {formatCurrency(item.amount)}
-                      </span>
-                    </div>
 
                     <div className="d-flex align-items-center gap-1 ms-2">
                       <button
@@ -693,42 +734,214 @@ export default function Billing() {
         </button>
       </div>
 
-      {/* 4. CLEAN INSTANT ACTION FOOTER */}
-      <div className="bg-white border rounded-3 p-3 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div className="d-flex align-items-center gap-3">
-          <span className="badge bg-light text-dark border px-3 py-2 fw-semibold">
-            {items.length} {items.length === 1 ? 'Item' : 'Items'}
-          </span>
-          <div className="d-flex align-items-baseline gap-2">
-            <span className="text-muted fw-bold small text-uppercase">Total Bill:</span>
-            <span className="fs-3 fw-extrabold text-danger">
-              {formatCurrency(grandTotal)}
-            </span>
+      {/* 4. PAYMENT MODE, PRODUCTION & SUMMARY SECTION (EXACT IMAGE 1 REPLICA) */}
+      <div className="row g-3">
+        {/* Left Column: Payment Mode & Production Details */}
+        <div className="col-lg-6 col-12">
+          <div className="bg-white border rounded-3 p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+            <div>
+              <div className="d-flex align-items-center gap-2 mb-3 text-primary fw-bold fs-6">
+                <CreditCard size={18} />
+                <span>Payment Mode &amp; Production Details</span>
+              </div>
+
+              <div className="row g-2 mb-3">
+                <div className="col-6">
+                  <label className="form-label small fw-bold text-muted mb-1">
+                    Payment Method
+                  </label>
+                  <select
+                    className="form-select form-select-sm fw-semibold"
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                  >
+                    <option value="UPI (Google Pay / PhonePe)">UPI (Google Pay / PhonePe)</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Credit">Credit (Pending)</option>
+                  </select>
+                </div>
+
+                <div className="col-6">
+                  <label className="form-label small fw-bold text-muted mb-1">
+                    Production Stage
+                  </label>
+                  <select
+                    className="form-select form-select-sm fw-semibold"
+                    value={orderStatus}
+                    onChange={(e) => setOrderStatus(e.target.value)}
+                  >
+                    <option value="Order Received">Order Received</option>
+                    <option value="Design Pending">Design Pending</option>
+                    <option value="Designing">Designing</option>
+                    <option value="Printing in Progress">Printing in Progress</option>
+                    <option value="Quality Check">Quality Check</option>
+                    <option value="Ready for Delivery">Ready for Delivery</option>
+                    <option value="Delivered">Delivered &amp; Closed</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label small fw-bold text-muted mb-1">
+                  Job Notes / Delivery Instructions
+                </label>
+                <textarea
+                  className="form-control form-control-sm text-muted"
+                  rows="3"
+                  placeholder="e.g. Ring eyelets on left edge, client will pick up at 4 PM..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="d-flex align-items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm px-3 fw-semibold"
-            onClick={resetForm}
-          >
-            <RotateCcw size={14} className="me-1 d-inline" /> Clear Form
-          </button>
-          <button
-            type="button"
-            className="btn btn-vyapar-sale btn-sm px-4 fw-semibold shadow-sm"
-            onClick={() => handleSaveInvoice(false)}
-          >
-            <Save size={15} className="me-1 d-inline" /> {editingInvoice ? 'Update Bill' : 'Save Bill'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-vyapar-print btn-sm px-4 py-2 fw-bold shadow-sm"
-            onClick={() => handleSaveInvoice(true)}
-          >
-            <Printer size={16} className="me-1 d-inline" /> Save &amp; Print Bill
-          </button>
+        {/* Right Column: Billing & Amounts Card (Matching Image 1 Pixel-for-Pixel) */}
+        <div className="col-lg-6 col-12">
+          <div className="bg-white border rounded-3 p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+            <div className="space-y-2">
+              {/* Subtotal */}
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <span className="fw-bold text-dark fs-6">Subtotal:</span>
+                <span className="fw-extrabold text-dark fs-5">{formatCurrency(subtotal)}</span>
+              </div>
+
+              {/* Discount Controls */}
+              <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <span className="fw-bold text-dark small">Discount:</span>
+                  <div className="btn-group btn-group-sm" role="group">
+                    <button
+                      type="button"
+                      className={`btn btn-sm py-0 px-2 fw-semibold ${discountType === 'flat' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      onClick={() => setDiscountType('flat')}
+                    >
+                      Flat ₹
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm py-0 px-2 fw-semibold ${discountType === 'percent' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      onClick={() => setDiscountType('percent')}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+
+                <div className="input-group input-group-sm" style={{ maxWidth: '140px' }}>
+                  <span className="input-group-text bg-white">{discountType === 'flat' ? '₹' : '%'}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    className="form-control form-control-sm text-end fw-semibold bg-white"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Big Vibrant Blue TOTAL BILL AMOUNT Card */}
+              <div className="total-amount-blue-card p-3 rounded-3 shadow-sm mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <span className="total-card-subtitle text-uppercase">TOTAL BILL AMOUNT</span>
+                  <span className="badge bg-white text-primary fw-bold px-2 py-1">
+                    {items.length} {items.length === 1 ? 'Item' : 'Items'}
+                  </span>
+                </div>
+                <div className="total-card-amount fs-2 fw-extrabold text-white lh-1 mb-2">
+                  {formatCurrency(grandTotal)}
+                </div>
+                <div className="total-card-words text-white-50 fst-italic small text-capitalize">
+                  {numberToWordsINR(grandTotal)}
+                </div>
+              </div>
+
+              {/* Advance Paid & Balance Due */}
+              <div className="row g-2 align-items-center mb-3">
+                <div className="col-7">
+                  <div className="d-flex align-items-center justify-content-between mb-1">
+                    <label className="form-label small fw-bold text-dark mb-0">Advance Paid</label>
+                    <div className="d-flex gap-1">
+                      <button
+                        type="button"
+                        className="btn btn-outline-success btn-xs py-0 px-1 fw-bold"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={() => handleQuickPaid('full')}
+                      >
+                        Full
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-xs py-0 px-1 fw-bold"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={() => handleQuickPaid('half')}
+                      >
+                        50%
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger btn-xs py-0 px-1 fw-bold"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={() => handleQuickPaid('zero')}
+                      >
+                        0
+                      </button>
+                    </div>
+                  </div>
+                  <div className="input-group input-group-sm">
+                    <span className="input-group-text bg-white text-success fw-bold">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      className="form-control form-control-sm fw-bold text-success bg-white"
+                      value={advancePaid}
+                      onChange={(e) => setAdvancePaid(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="col-5">
+                  <label className="form-label small fw-bold text-dark mb-1">Balance Due</label>
+                  <div className="balance-due-pill p-2 rounded-3 border d-flex align-items-center justify-content-center gap-1">
+                    <AlertCircle size={15} className="text-danger" />
+                    <span className="fw-bold text-danger fs-6">
+                      {formatCurrency(balanceDue)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons (Save & Print Bill + Save) */}
+            <div className="row g-2 mt-2">
+              <div className="col-8">
+                <button
+                  type="button"
+                  className="btn btn-vyapar-print w-100 py-2 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2"
+                  onClick={() => handleSaveInvoice(true)}
+                >
+                  <Printer size={18} />
+                  <span>Save &amp; Print Bill</span>
+                </button>
+              </div>
+              <div className="col-4">
+                <button
+                  type="button"
+                  className="btn btn-primary-custom w-100 py-2 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-1"
+                  onClick={() => handleSaveInvoice(false)}
+                >
+                  <Save size={18} />
+                  <span>{editingInvoice ? 'Update' : 'Save'}</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

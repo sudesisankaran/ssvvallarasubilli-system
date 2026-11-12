@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useShop } from '../context/ShopContext';
-import { formatCurrency, formatDate, numberToWordsINR } from '../utils/constants';
-import { Printer, Download, Share2, X, Pencil, Flag } from 'lucide-react';
+import { formatCurrency, formatDateDMY, numberToWordsINR } from '../utils/constants';
+import { Printer, Download, Share2, X, Pencil } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 
 export default function InvoiceModal() {
@@ -19,19 +19,20 @@ export default function InvoiceModal() {
   if (!viewingInvoice) return null;
 
   const inv = viewingInvoice;
-  const isInterstate = inv.isInterstate || inv.placeOfSupply === 'Inter-State';
 
+  // Print Invoice
   const handlePrint = () => {
     window.print();
   };
 
+  // Download PDF
   const handleDownloadPDF = () => {
     if (!printAreaRef.current) return;
     addToast('Generating PDF file...', 'info');
 
     const opt = {
-      margin: 8,
-      filename: `${inv.invoiceNumber}_${inv.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+      margin: [5, 5, 5, 5],
+      filename: `Bill_${inv.invoiceNumber}_${(inv.customerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -45,76 +46,123 @@ export default function InvoiceModal() {
     });
   };
 
+  // WhatsApp Share
   const handleWhatsApp = () => {
     const phone = (inv.customerPhone || '').replace(/[^0-9]/g, '');
-    const itemsText = (inv.items || []).map(i => `• ${i.quantity} ${i.unit} ${i.serviceName} - ₹${i.amount}`).join('\n');
+    const itemsText = (inv.items || []).map(i => `• ${i.quantity} ${i.unit || 'Pcs'} ${i.serviceName} - ₹${i.amount}`).join('\n');
 
     const text = encodeURIComponent(
-`🚩 *INVOICE FROM ${settings.shopName || 'SSV VALLARASU'}*
+`🚩 *BILL OF SUPPLY - ${settings.shopName || 'SSV VALLARASU FLAG & T SHIRT PRINTING'}*
 *Invoice No:* ${inv.invoiceNumber}
-*Date:* ${inv.date}
+*Date:* ${formatDateDMY(inv.date)}
 *Customer:* ${inv.customerName}
 
-*Order Items:*
+*Items:*
 ${itemsText}
 
-*Grand Total:* ₹${inv.grandTotal.toFixed(2)}
-*Paid Amount:* ₹${inv.paidAmount.toFixed(2)}
-*Balance Due:* ₹${inv.balanceAmount.toFixed(2)}
-*Payment Status:* ${inv.paymentStatus}
+*Total Amount:* ₹${Number(inv.grandTotal || 0).toFixed(2)}
+*Received:* ₹${Number(inv.paidAmount || 0).toFixed(2)}
+*Balance Due:* ₹${Number(inv.balanceAmount || 0).toFixed(2)}
+*Payment Mode:* ${inv.paymentMode || 'Cash'}
 
-*UPI Payment ID:* ${settings.upiId}
-*Bank Details:* ${settings.bankName} | A/C: ${settings.accountNumber} | IFSC: ${settings.ifscCode}
-
-Thank you for choosing SSV Vallarasu Flags & Printing!
-Phone: ${settings.phone}`
+Thank you for choosing SSV Vallarasu Flag & T Shirt Printing!
+Phone: ${settings.phone || '9360801346'}`
     );
 
     const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
   };
 
+  // Edit Invoice
   const handleEdit = () => {
     setEditingInvoice(inv);
     setViewingInvoice(null);
     setActiveTab('billing');
   };
 
+  // Calculate items summary
+  const items = inv.items || [];
+  const totalQty = items.reduce((sum, itm) => sum + (parseFloat(itm.quantity) || 0), 0);
+
+  // Compute item discounts
+  let totalItemDiscount = 0;
+  let totalGrossAmount = 0;
+
+  const processedItems = items.map(itm => {
+    const qty = parseFloat(itm.quantity) || 1;
+    const rate = parseFloat(itm.rate) || 0;
+    const netAmount = parseFloat(itm.amount) || (qty * rate);
+    
+    // Check if item has explicit discount or area rate
+    let gross = (itm.width > 0 && itm.height > 0)
+      ? (itm.width * itm.height * qty * rate)
+      : (qty * rate);
+    
+    if (gross < netAmount) gross = netAmount;
+
+    let discount = parseFloat(itm.discount) || (gross > netAmount ? gross - netAmount : 0);
+    let discountPct = gross > 0 ? (discount / gross) * 100 : 0;
+
+    totalItemDiscount += discount;
+    totalGrossAmount += gross;
+
+    let sizeStr = itm.size || '';
+    if (!sizeStr && itm.width > 0 && itm.height > 0) {
+      sizeStr = `${itm.width}x${itm.height}`;
+    }
+
+    return {
+      ...itm,
+      gross,
+      discount,
+      discountPct,
+      sizeStr,
+      netAmount
+    };
+  });
+
+  const invoiceDiscount = parseFloat(inv.discountAmount) || 0;
+  const youSaved = totalItemDiscount + invoiceDiscount;
+  const subTotal = totalGrossAmount > 0 ? totalGrossAmount : inv.grandTotal;
+  const totalAmount = inv.grandTotal;
+  const receivedAmount = inv.paidAmount || 0;
+  const balanceAmount = inv.balanceAmount !== undefined ? inv.balanceAmount : Math.max(0, totalAmount - receivedAmount);
+
   return (
     <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(15, 23, 42, 0.75)' }} tabIndex="-1">
       <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div className="modal-content modal-content-custom">
-          {/* Header Controls */}
+          {/* Header Controls (No-Print) */}
           <div className="modal-header modal-header-custom d-flex align-items-center justify-content-between no-print">
-            <h5 className="modal-title fw-bold mb-0">Tax Invoice: {inv.invoiceNumber}</h5>
+            <h5 className="modal-title fw-bold mb-0">Bill of Supply: {inv.invoiceNumber}</h5>
             <div className="d-flex align-items-center gap-2">
               <button
                 type="button"
-                className="btn btn-sm btn-primary-custom"
+                className="btn btn-sm btn-vyapar-print"
                 onClick={handlePrint}
               >
-                <Printer size={15} /> Print Invoice
+                <Printer size={15} className="me-1" /> Print Invoice
               </button>
               <button
                 type="button"
                 className="btn btn-sm btn-outline-primary"
                 onClick={handleDownloadPDF}
               >
-                <Download size={15} /> Download PDF
+                <Download size={15} className="me-1" /> Download PDF
               </button>
               <button
                 type="button"
                 className="btn btn-sm btn-success"
                 onClick={handleWhatsApp}
               >
-                <Share2 size={15} /> WhatsApp
+                <Share2 size={15} className="me-1" /> WhatsApp
               </button>
               <button
                 type="button"
                 className="btn btn-sm btn-outline-secondary"
                 onClick={handleEdit}
               >
-                <Pencil size={15} /> Edit
+                <Pencil size={15} className="me-1" /> Edit
               </button>
               <button
                 type="button"
@@ -127,218 +175,262 @@ Phone: ${settings.phone}`
           </div>
 
           {/* Printable Body */}
-          <div className="modal-body bg-light p-4">
-            <div className="invoice-print-container" id="printableInvoiceArea" ref={printAreaRef}>
-              {/* Top Header */}
-              <div className="invoice-header d-flex justify-content-between align-items-start">
-                <div className="d-flex gap-3 align-items-start">
-                  {settings.logoUrl ? (
-                    <img
-                      src={settings.logoUrl}
-                      alt="Logo"
-                      style={{ width: '65px', height: '65px', objectFit: 'contain' }}
-                      className="rounded border p-1"
-                    />
-                  ) : (
-                    <div className="brand-logo-icon" style={{ width: '56px', height: '56px' }}>
-                      <Flag className="w-6 h-6 text-white" />
-                    </div>
-                  )}
-
-                  <div>
-                    {settings.tamilTitle && <div className="inv-brand-tamil">{settings.tamilTitle}</div>}
-                    <h1 className="inv-brand-title">{settings.shopName || 'SSV VALLARASU'}</h1>
-                    <div className="inv-brand-tagline">{settings.shopSubtitle || 'FLAGS & PRINTING'}</div>
-                    <div className="small text-muted mt-2" style={{ maxWidth: '420px', lineHeight: '1.4' }}>
-                      {settings.address}<br />
-                      <strong>Phone:</strong> {settings.phone} | <strong>WhatsApp:</strong> {settings.whatsapp}<br />
-                      <strong>Email:</strong> {settings.email}<br />
-                      <strong>GSTIN:</strong> <span className="fw-bold text-dark">{settings.gstin}</span> | <strong>State:</strong> {settings.state} ({settings.stateCode})
-                    </div>
-                  </div>
+          <div className="modal-body bg-light p-3 p-md-4">
+            <div className="vyapar-bill-sheet" id="printableInvoiceArea" ref={printAreaRef}>
+              
+              {/* 1. TOP HEADER BANNER (Vibrant Orange Vyapar Style) */}
+              <div className="vyapar-orange-banner">
+                <div className="vyapar-banner-logo">
+                  <img
+                    src={settings.logoUrl || '/assets/ssv_logo.png'}
+                    alt="SSV Vallarasu"
+                    className="vyapar-logo-img"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
                 </div>
-
-                <div className="text-end">
-                  <div className="inv-badge-title mb-2">
-                    {inv.gstEnabled ? 'TAX INVOICE' : 'BILL / CASH MEMO'}
+                <div className="vyapar-banner-info">
+                  <h1 className="vyapar-shop-title">
+                    {settings.shopName || 'SSV VALLARASU FLAG & T SHIRT PRINTING'}
+                  </h1>
+                  <div className="vyapar-shop-address">
+                    {settings.address || 'RAYAKOTTAI, TOMATO MARKT-635116 SP COMPLEX'}
                   </div>
-                  <div className="invoice-meta-box text-start mt-2">
-                    <div className="d-flex justify-content-between gap-3 mb-1">
-                      <span className="text-muted small">Bill No:</span>
-                      <span className="fw-bold text-primary">{inv.invoiceNumber}</span>
-                    </div>
-                    <div className="d-flex justify-content-between gap-3 mb-1">
-                      <span className="text-muted small">Date:</span>
-                      <span className="fw-semibold">{formatDate(inv.date)}</span>
-                    </div>
-                    {inv.deliveryDate && (
-                      <div className="d-flex justify-content-between gap-3 mb-1">
-                        <span className="text-muted small">Delivery:</span>
-                        <span className="fw-semibold">{formatDate(inv.deliveryDate)}</span>
-                      </div>
-                    )}
-                    {inv.gstEnabled && (
-                      <div className="d-flex justify-content-between gap-3">
-                        <span className="text-muted small">Place of Supply:</span>
-                        <span className="fw-semibold">{inv.placeOfSupply || 'Tamil Nadu (33)'}</span>
-                      </div>
-                    )}
+                  <div className="vyapar-shop-contact">
+                    Phone no.: {settings.phone || '9360801346'} Email: {settings.email || 'digitalssv126@gmail.com'}
+                  </div>
+                  <div className="vyapar-shop-state">
+                    State: {settings.stateCode || '33'}-{settings.state || 'Tamil Nadu'}
                   </div>
                 </div>
               </div>
 
-              {/* Customer Details & Order Status */}
-              <div className="row g-3 mb-3">
-                <div className="col-7">
-                  <div className="p-3 bg-light rounded border h-100">
-                    <div className="text-uppercase small fw-bold text-muted mb-1">Billed To (Customer):</div>
-                    <div className="fw-bold fs-6 text-dark">{inv.customerName}</div>
-                    <div className="small text-muted mb-1">{inv.customerPhone || 'N/A'}</div>
-                    <div className="small text-muted mb-1">{inv.customerAddress || 'Local Customer'}</div>
-                    {inv.customerGstin && <div className="small"><strong>GSTIN:</strong> {inv.customerGstin}</div>}
+              {/* 2. DOCUMENT TITLE */}
+              <div className="vyapar-doc-title">
+                Bill of Supply
+              </div>
+
+              {/* 3. BILL TO & INVOICE DETAILS STRIP */}
+              <div className="vyapar-details-row">
+                {/* Left: Bill To */}
+                <div className="vyapar-bill-to-col">
+                  <div className="vyapar-section-header">
+                    Bill To
+                  </div>
+                  <div className="vyapar-section-body">
+                    <div className="vyapar-cust-name">{inv.customerName || '-'}</div>
+                    {inv.customerAddress && (
+                      <div className="vyapar-cust-address">{inv.customerAddress}</div>
+                    )}
+                    {inv.customerPhone && (
+                      <div className="vyapar-cust-contact">
+                        Contact No. : {inv.customerPhone}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="col-5">
-                  <div className="p-3 bg-light rounded border h-100 d-flex flex-column justify-content-between">
-                    <div>
-                      <div className="text-uppercase small fw-bold text-muted mb-1">Order Details:</div>
-                      <div className="small"><strong>Order Status:</strong> <span className="badge bg-light text-dark border ms-1">{inv.orderStatus}</span></div>
-                      <div className="small mt-1"><strong>Payment Status:</strong> <span className={`fw-bold ms-1 ${inv.paymentStatus === 'Paid' ? 'text-success' : (inv.paymentStatus === 'Partial' ? 'text-warning' : 'text-danger')}`}>{inv.paymentStatus}</span></div>
-                      <div className="small mt-1"><strong>Payment Mode:</strong> {inv.paymentMode || 'Cash'}</div>
+                {/* Right: Invoice Details */}
+                <div className="vyapar-invoice-meta-col">
+                  <div className="vyapar-section-header text-end">
+                    Invoice Details
+                  </div>
+                  <div className="vyapar-section-body text-end">
+                    <div className="vyapar-meta-line">
+                      <span className="vyapar-meta-label">Invoice No. : </span>
+                      <span className="vyapar-meta-val">{inv.invoiceNumber}</span>
                     </div>
-                    {inv.notes && <div className="small text-muted fst-italic mt-2">"{inv.notes}"</div>}
+                    <div className="vyapar-meta-line">
+                      <span className="vyapar-meta-label">Date : </span>
+                      <span className="vyapar-meta-val">{formatDateDMY(inv.date)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Itemized Table */}
-              <table className="inv-table">
+              {/* 4. ITEMIZED PRODUCTS TABLE */}
+              <table className="vyapar-items-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '40px' }} className="text-center">#</th>
-                    <th>Description &amp; Specifications</th>
-                    <th style={{ width: '100px' }} className="text-center">Dimensions</th>
-                    <th style={{ width: '70px' }} className="text-center">Qty</th>
-                    <th style={{ width: '60px' }} className="text-center">Unit</th>
-                    <th style={{ width: '90px' }} className="text-end">Rate</th>
-                    <th style={{ width: '110px' }} className="text-end">Amount</th>
+                    <th style={{ width: '4%' }} className="text-center">#</th>
+                    <th style={{ width: '32%' }}>Item name</th>
+                    <th style={{ width: '14%' }} className="text-center">Size</th>
+                    <th style={{ width: '10%' }} className="text-center">Quantity</th>
+                    <th style={{ width: '14%' }} className="text-end">Price/ Unit</th>
+                    <th style={{ width: '13%' }} className="text-end">Discount</th>
+                    <th style={{ width: '13%' }} className="text-end">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(inv.items || []).map((itm, i) => (
-                    <tr key={i}>
-                      <td className="text-center text-muted">{i + 1}</td>
-                      <td>
-                        <div className="fw-bold text-dark">{itm.serviceName}</div>
-                        {itm.description && <div className="small text-muted">{itm.description}</div>}
-                        <div className="small text-secondary fw-semibold">{itm.category}</div>
-                      </td>
-                      <td className="text-center small">
-                        {(itm.width > 0 && itm.height > 0) ? `${itm.width} × ${itm.height} ft` : '-'}
-                      </td>
-                      <td className="text-center fw-bold">{itm.quantity}</td>
-                      <td className="text-center small text-muted">{itm.unit}</td>
+                  {processedItems.map((itm, i) => (
+                    <tr key={itm.id || i}>
+                      <td className="text-center">{i + 1}</td>
+                      <td className="fw-semibold text-uppercase">{itm.serviceName}</td>
+                      <td className="text-center">{itm.sizeStr || '-'}</td>
+                      <td className="text-center">{itm.quantity}</td>
                       <td className="text-end">{formatCurrency(itm.rate)}</td>
-                      <td className="text-end fw-bold">{formatCurrency(itm.amount)}</td>
+                      <td className="text-end">
+                        {itm.discount > 0 ? (
+                          <div>
+                            <div>{formatCurrency(itm.discount)}</div>
+                            <div className="vyapar-disc-pct">({itm.discountPct.toFixed(3)}%)</div>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="text-end fw-bold">{formatCurrency(itm.netAmount)}</td>
+                    </tr>
+                  ))}
+
+                  {/* Empty Spacer Rows if few items, matching Vyapar classic height */}
+                  {processedItems.length < 3 && Array.from({ length: 3 - processedItems.length }).map((_, idx) => (
+                    <tr key={'empty-' + idx} className="vyapar-empty-row">
+                      <td>&nbsp;</td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="vyapar-table-total-row">
+                    <td colSpan={2} className="fw-bold text-start ps-3">Total</td>
+                    <td></td>
+                    <td className="text-center fw-bold">{totalQty}</td>
+                    <td></td>
+                    <td className="text-end fw-bold">
+                      {totalItemDiscount > 0 ? formatCurrency(totalItemDiscount) : '-'}
+                    </td>
+                    <td className="text-end fw-bold">{formatCurrency(totalAmount)}</td>
+                  </tr>
+                </tfoot>
               </table>
 
-              {/* Bank Details & Totals */}
-              <div className="row g-3">
-                <div className="col-7">
-                  <div className="inv-bank-box mb-3">
-                    <div className="fw-bold text-dark mb-1">Bank &amp; Payment Details:</div>
-                    <div><strong>Bank:</strong> {settings.bankName}</div>
-                    <div><strong>A/C No:</strong> <span className="fw-bold text-dark">{settings.accountNumber}</span></div>
-                    <div><strong>IFSC:</strong> {settings.ifscCode} | <strong>Branch:</strong> {settings.branch}</div>
-                    <div className="mt-1"><strong>UPI ID:</strong> <span className="badge bg-primary text-white">{settings.upiId}</span></div>
+              {/* 5. SUMMARY & AMOUNTS SECTION */}
+              <div className="vyapar-summary-row">
+                {/* Left Side: Amount In Words & Payment Mode */}
+                <div className="vyapar-summary-left">
+                  <div className="vyapar-strip-header">
+                    Invoice Amount In Words
+                  </div>
+                  <div className="vyapar-strip-content text-capitalize">
+                    {numberToWordsINR(totalAmount)}
                   </div>
 
-                  <div className="p-2 border rounded bg-white small text-muted">
-                    <div className="fw-bold text-dark mb-1">Amount in Words:</div>
-                    <div className="fw-semibold text-primary">{numberToWordsINR(inv.grandTotal)}</div>
+                  <div className="vyapar-strip-header mt-3">
+                    Payment mode
+                  </div>
+                  <div className="vyapar-strip-content">
+                    {inv.paymentMode || 'Cash'}
                   </div>
                 </div>
 
-                <div className="col-5">
-                  <div className="p-3 bg-light rounded border">
-                    <div className="d-flex justify-content-between mb-1 small">
-                      <span className="text-muted">Subtotal:</span>
-                      <span className="fw-semibold">{formatCurrency(inv.subtotal)}</span>
+                {/* Right Side: Amounts & Signatory */}
+                <div className="vyapar-summary-right">
+                  <div className="vyapar-strip-header text-end">
+                    Amounts
+                  </div>
+                  <div className="vyapar-amounts-box">
+                    <div className="vyapar-amt-line">
+                      <span>Sub Total</span>
+                      <span>{formatCurrency(subTotal)}</span>
                     </div>
-
-                    {inv.discountAmount > 0 && (
-                      <div className="d-flex justify-content-between mb-1 small text-danger">
-                        <span>Discount:</span>
-                        <span>-{formatCurrency(inv.discountAmount)}</span>
+                    <div className="vyapar-amt-line fw-bold">
+                      <span>Total</span>
+                      <span>{formatCurrency(totalAmount)}</span>
+                    </div>
+                    <div className="vyapar-amt-line">
+                      <span>Received</span>
+                      <span>{formatCurrency(receivedAmount)}</span>
+                    </div>
+                    <div className="vyapar-amt-line">
+                      <span>Balance</span>
+                      <span>{formatCurrency(balanceAmount)}</span>
+                    </div>
+                    {youSaved > 0 && (
+                      <div className="vyapar-amt-line vyapar-saved-line">
+                        <span>You Saved</span>
+                        <span className="fw-bold">{formatCurrency(youSaved)}</span>
                       </div>
                     )}
+                  </div>
 
-                    {inv.gstEnabled && (
-                      <>
-                        <div className="d-flex justify-content-between mb-1 small">
-                          <span className="text-muted">Taxable Value:</span>
-                          <span className="fw-semibold">{formatCurrency(inv.taxableAmount)}</span>
-                        </div>
+                  {/* Signatory Box */}
+                  <div className="vyapar-sign-container">
+                    <div className="vyapar-sign-title">
+                      For : {settings.shopName || 'SSV VALLARASU FLAG & T SHIRT PRINTING'}
+                    </div>
+                    <div className="vyapar-sign-img-wrapper">
+                      <img
+                        src={settings.signatureUrl || '/assets/signature.png'}
+                        alt="Signature"
+                        className="vyapar-signature-img"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                    <div className="vyapar-sign-label">
+                      Authorized Signatory
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                        {isInterstate ? (
-                          <div className="d-flex justify-content-between mb-1 small">
-                            <span className="text-muted">IGST ({inv.gstRate}%):</span>
-                            <span>{formatCurrency(inv.igstAmount)}</span>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="d-flex justify-content-between mb-1 small">
-                              <span className="text-muted">CGST ({(inv.gstRate / 2).toFixed(1)}%):</span>
-                              <span className="small fw-semibold">{formatCurrency(inv.cgstAmount)}</span>
-                            </div>
-                            <div className="d-flex justify-content-between mb-1 small">
-                              <span className="text-muted">SGST ({(inv.gstRate / 2).toFixed(1)}%):</span>
-                              <span className="small fw-semibold">{formatCurrency(inv.sgstAmount)}</span>
-                            </div>
-                          </>
-                        )}
-                      </>
+              {/* 6. PERFORATED TEAR-OFF ACKNOWLEDGEMENT SLIP */}
+              <div className="vyapar-ack-slip">
+                <div className="vyapar-perforation-line">
+                  <span className="vyapar-perforation-text">Acknowledgement</span>
+                </div>
+
+                <div className="vyapar-ack-shop-title">
+                  {settings.shopName || 'SSV VALLARASU FLAG & T SHIRT PRINTING'}
+                </div>
+
+                <div className="vyapar-ack-grid">
+                  {/* Left Column: Invoice To */}
+                  <div className="vyapar-ack-col">
+                    <div className="vyapar-ack-header">Invoice To:</div>
+                    <div className="vyapar-ack-cust-name">{inv.customerName || '-'}</div>
+                    {inv.customerAddress && (
+                      <div className="vyapar-ack-cust-addr">{inv.customerAddress}</div>
                     )}
+                  </div>
 
-                    <hr className="my-2" />
-
-                    <div className="d-flex justify-content-between mb-2">
-                      <span className="fw-bold fs-6 text-dark">Grand Total:</span>
-                      <span className="fw-extrabold fs-5 text-danger">{formatCurrency(inv.grandTotal)}</span>
+                  {/* Middle Column: Invoice Details */}
+                  <div className="vyapar-ack-col">
+                    <div className="vyapar-ack-header">Invoice Details:</div>
+                    <div className="vyapar-ack-detail-line">
+                      <span>Invoice No. : </span>
+                      <span>{inv.invoiceNumber}</span>
                     </div>
-
-                    <div className="d-flex justify-content-between mb-1 small text-success">
-                      <span>Paid / Advance:</span>
-                      <span className="fw-bold">{formatCurrency(inv.paidAmount)}</span>
+                    <div className="vyapar-ack-detail-line">
+                      <span>Invoice date : </span>
+                      <span>{formatDateDMY(inv.date)}</span>
                     </div>
+                    <div className="vyapar-ack-detail-line">
+                      <span>Invoice Amount : </span>
+                      <span>{formatCurrency(totalAmount)}</span>
+                    </div>
+                  </div>
 
-                    <div className={`d-flex justify-content-between small ${inv.balanceAmount > 0 ? 'text-danger fw-bold' : 'text-muted'}`}>
-                      <span>Balance Due:</span>
-                      <span>{formatCurrency(inv.balanceAmount)}</span>
+                  {/* Right Column: Receiver Seal & Sign */}
+                  <div className="vyapar-ack-col text-center">
+                    <div className="vyapar-ack-seal-dots">
+                      ....................................................
+                    </div>
+                    <div className="vyapar-ack-seal-label">
+                      Receiver's Seal &amp; Sign.
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Terms & Signature */}
-              <div className="row align-items-end mt-4">
-                <div className="col-8">
-                  <div className="small text-muted" style={{ fontSize: '0.72rem', lineHeight: '1.4' }}>
-                    <div className="fw-bold text-dark mb-1">Terms &amp; Conditions:</div>
-                    <div style={{ whiteSpace: 'pre-line' }}>{settings.terms}</div>
-                  </div>
-                </div>
-                <div className="col-4">
-                  <div className="inv-sign-box">
-                    <div className="fw-bold text-dark">For {settings.shopName || 'SSV VALLARASU'}</div>
-                    <div className="text-muted small mt-4">Authorized Signatory</div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -346,4 +438,3 @@ Phone: ${settings.phone}`
     </div>
   );
 }
-

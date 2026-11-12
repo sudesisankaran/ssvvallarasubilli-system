@@ -11,29 +11,30 @@ export const STORAGE_KEYS = {
 };
 
 export const DEFAULT_SETTINGS = {
-  shopName: 'SSV VALLARASU FLAG PRINTING',
-  shopSubtitle: 'FLAGS & DIGITAL PRINTING',
-  tamilTitle: 'ஸ்ரீ சுப்ரமண்யா வேல் வல்லரசு கொடி & பிரிண்டிங்',
-  tagline: 'Leading Manufacturer of Digital Flags, Political Flags, Banners & Display Boards',
-  phone: '93608 01346',
-  whatsapp: '93608 01346',
-  email: 'ssvvallarasuflags@gmail.com',
-  address: 'Rayakottai, Krishnagiri - 635116, Tamil Nadu',
+  shopName: 'SSV VALLARASU FLAG & T SHIRT PRINTING',
+  shopSubtitle: 'RAYAKOTTAI, TOMATO MARKT-635116 SP COMPLEX',
+  tamilTitle: '',
+  tagline: 'FLAG & T SHIRT PRINTING',
+  phone: '9360801346',
+  whatsapp: '9360801346',
+  email: 'digitalssv126@gmail.com',
+  address: 'RAYAKOTTAI, TOMATO MARKT-635116 SP COMPLEX',
   city: 'Rayakottai',
   district: 'Krishnagiri',
   pincode: '635116',
   state: 'Tamil Nadu',
   stateCode: '33',
-  gstin: '33AAACV9842F1Z4',
-  invoicePrefix: 'SSV-2026-',
-  nextInvoiceNum: 1001,
-  defaultGstRate: 18,
+  gstin: '',
+  invoicePrefix: '',
+  nextInvoiceNum: 1,
+  defaultGstRate: 0,
   bankName: 'State Bank of India',
   accountNumber: '382947192840',
   ifscCode: 'SBIN0001234',
   branch: 'Rayakottai Branch',
   upiId: '9360801346@upi',
-  logoUrl: null, // Custom user-uploaded logo
+  logoUrl: '/assets/ssv_logo.png',
+  signatureUrl: '/assets/signature.png',
   currency: 'INR (₹)',
   terms: `1. 50% advance payment required for custom flag and bulk banner orders.
 2. Digital artwork approval is mandatory prior to printing.
@@ -184,6 +185,20 @@ export function formatDate(dateStr) {
       month: 'short',
       year: 'numeric'
     });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+export function formatDateDMY(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
   } catch (e) {
     return dateStr;
   }
